@@ -1,3 +1,9 @@
+"""Fake agent adapter for Phase 0.
+
+This file gives Chorus a tiny deterministic agent so we can test the harness
+without paying for a model or depending on an external agent framework.
+"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -19,4 +25,3 @@ def fake_tools() -> dict[str, Any]:
         "echo": lambda args: args["text"],
         "uppercase": lambda args: args["text"].upper(),
     }
-

@@ -1,3 +1,9 @@
+"""Markdown report renderer.
+
+This file turns a RunResult into human-readable Markdown so CLI output and
+future CI comments can show the same reliability summary.
+"""
+
 from __future__ import annotations
 
 from chorus.core.types import RunResult
@@ -21,4 +27,3 @@ def render_run_report(result: RunResult) -> str:
             f"- p95 latency: `{result.metrics.p95_latency_ms:.2f} ms`",
         ]
     )
-

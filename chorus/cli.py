@@ -1,3 +1,9 @@
+"""Command-line interface for Chorus.
+
+This file turns the Phase 0 harness into commands a user can run: record a
+dummy run, replay it, and intentionally mutate it to prove divergence detection.
+"""
+
 from __future__ import annotations
 
 import asyncio

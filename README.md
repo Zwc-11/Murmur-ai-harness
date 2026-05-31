@@ -1,3 +1,8 @@
+<!--
+This is the repo entrypoint for humans. It explains what Chorus is, what works
+right now, and the commands needed to install, test, and run the Phase 0 demo.
+-->
+
 # Chorus
 
 Chorus is an open-source reliability and cost harness for coding agents. It runs an

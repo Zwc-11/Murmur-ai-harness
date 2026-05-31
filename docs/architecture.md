@@ -1,3 +1,8 @@
+<!--
+This document is the product architecture and roadmap. It explains the target
+system, the design principles, and the phased build plan that the code follows.
+-->
+
 # Chorus — Architecture & Roadmap
 
 > An open-source reliability + cost harness for coding agents.

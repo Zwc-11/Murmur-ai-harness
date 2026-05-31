@@ -1,3 +1,9 @@
+"""JSONL event store.
+
+This file implements the zero-config storage backend: one event per line in a
+local JSONL file. It is simple, inspectable, and good for first demos.
+"""
+
 from __future__ import annotations
 
 import json

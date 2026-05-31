@@ -1,3 +1,9 @@
+"""Record/replay tool gateway.
+
+This file wraps tool calls so every request and response can be recorded. In
+replay mode it serves recorded responses and raises an error if the path changes.
+"""
+
 from __future__ import annotations
 
 import inspect

@@ -1,3 +1,9 @@
+"""Core port definitions.
+
+This file defines the interfaces the pure core depends on. Concrete adapters
+implement these ports so the core does not know about specific tools or vendors.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

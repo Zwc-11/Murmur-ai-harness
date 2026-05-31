@@ -1,3 +1,9 @@
+"""Reliability metric calculations.
+
+This file converts many trajectory outcomes into distribution-aware metrics:
+pass@1, pass^k, variance, Wilson confidence interval, cost, and latency.
+"""
+
 from __future__ import annotations
 
 from statistics import median
@@ -40,4 +46,3 @@ def reliability_metrics(trajectories: tuple[TrajectoryResult, ...]) -> Reliabili
         p50_latency_ms=median(latencies) if latencies else 0.0,
         p95_latency_ms=percentile(latencies, 0.95),
     )
-

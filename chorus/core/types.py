@@ -1,3 +1,9 @@
+"""Core data types.
+
+This file defines the small domain objects Chorus passes around: task specs,
+trajectory results, run metrics, and final run verdicts.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -49,4 +55,3 @@ class RunResult:
     metrics: ReliabilityMetrics
     escalations: int
     verdict: RunVerdict
-

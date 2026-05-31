@@ -1,3 +1,5 @@
+# Small command shortcuts for local development.
+# These targets wrap the exact Python commands we expect contributors to run.
 PYTHON ?= python
 
 .PHONY: install test lint format demo replay
@@ -19,4 +21,3 @@ demo:
 
 replay:
 	chorus replay --event-log .chorus/demo.jsonl
-
