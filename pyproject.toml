@@ -1,3 +1,5 @@
+# Project metadata and tool configuration.
+# This is the file Python packaging tools read to install Chorus and its dev tools.
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"

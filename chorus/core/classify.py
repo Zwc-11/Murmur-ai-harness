@@ -1,3 +1,9 @@
+"""Failure classification helpers.
+
+This file maps low-level errors into Chorus failure classes. The classifier
+stays read-only: it labels what happened, but it never drives the agent.
+"""
+
 from __future__ import annotations
 
 
@@ -12,4 +18,3 @@ def classify_failure(error: BaseException | None) -> str | None:
     if "key" in error_name or "value" in error_name:
         return "schema_mismatch"
     return "tool_error"
-

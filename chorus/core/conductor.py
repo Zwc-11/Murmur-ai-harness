@@ -1,3 +1,10 @@
+"""Run conductor.
+
+This file is the orchestrator for Phase 0. It starts a run, launches one or
+more trajectories, records events, asks the judge for outcomes, and can replay
+a recorded trajectory to catch divergence.
+"""
+
 from __future__ import annotations
 
 from time import perf_counter
@@ -136,4 +143,3 @@ def _expected_output(events: list[Event]) -> str:
         if event.type == EventType.VERDICT:
             return str(event.payload["output"])
     raise ReplayDivergenceError("recorded trajectory has no verdict event")
-

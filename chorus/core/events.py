@@ -1,3 +1,10 @@
+"""Event model and recorder.
+
+This file defines the append-only events that are the source of truth for
+Chorus. Runs, tool calls, verdicts, and replay checks are all derived from
+these recorded events.
+"""
+
 from __future__ import annotations
 
 import json

@@ -1,3 +1,9 @@
+"""In-memory event store.
+
+This file keeps events in a Python list. It is meant for tests and fast local
+checks where writing to disk would add noise.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Sequence

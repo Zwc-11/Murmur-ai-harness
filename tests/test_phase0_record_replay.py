@@ -1,3 +1,9 @@
+"""Phase 0 record/replay tests.
+
+These tests prove the current harness can record a deterministic run, replay it,
+and reject a replay when the task prompt changes.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -61,4 +67,3 @@ def test_replay_detects_divergence_when_step_changes() -> None:
 
     with pytest.raises(ReplayDivergenceError):
         run_async(conductor.replay(events=events, task=mutated_task))
-

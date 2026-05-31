@@ -1,3 +1,5 @@
+# GitHub Actions workflow for the repo itself.
+# It installs the package, runs lint, and runs tests on pushes and pull requests.
 name: CI
 
 on:
@@ -21,4 +23,3 @@ jobs:
         run: ruff check chorus tests
       - name: Test
         run: pytest
-
