@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import os
 import subprocess
 import sys
@@ -344,3 +345,89 @@ def gate(
     comment_out.write_text(comment + "\n", encoding="utf-8")
     typer.echo(f"\nComment written to {comment_out}")
     raise typer.Exit(1 if report.blocks else 0)
+
+
+@app.command()
+def bench(
+    subset: Annotated[
+        int, typer.Option(help="SWE-bench Verified subset size (0 = full set).")
+    ] = 50,
+    n: Annotated[int, typer.Option(min=1, help="Attempts per task (use >= k).")] = 10,
+    k: Annotated[int, typer.Option(min=1, help="Horizon for the pass^k headline.")] = 5,
+    model: Annotated[str, typer.Option(help="Model id; held fixed across scaffolds.")] = "",
+    scaffold_a: Annotated[str, typer.Option(help="Reference scaffold.")] = "single-shot",
+    scaffold_b: Annotated[str, typer.Option(help="Candidate scaffold (the harness change).")] = (
+        "self-repair"
+    ),
+    max_workers: Annotated[int, typer.Option(help="SWE-bench evaluator Docker workers.")] = 4,
+    seed: Annotated[int, typer.Option(help="Base seed for attempt fan-out.")] = 0,
+    out_dir: Annotated[Path, typer.Option(help="Where to write the report + suite JSON.")] = Path(
+        ".chorus/bench"
+    ),
+) -> None:
+    """Run the SWE-bench harness-only comparison and print the headline pass^k.
+
+    Holds one model fixed, varies only the scaffold, and reports pass^k for each
+    with the paired-delta verdict. Requires ANTHROPIC_API_KEY + Docker + the
+    ``bench`` extra; it refuses to invent a number when those are absent.
+    """
+
+    from chorus.benchmarks.swe.evaluator import SubprocessSweEvaluator
+    from chorus.benchmarks.swe.model import DEFAULT_MODEL, AnthropicPatchModel
+    from chorus.benchmarks.swe.runner import compare_scaffolds, run_scaffold
+    from chorus.benchmarks.swe.scaffold import BUILTIN_SCAFFOLDS
+    from chorus.benchmarks.swe.types import BenchDependencyMissing
+    from chorus.report.swe_md import render_benchmark_report
+
+    for name in (scaffold_a, scaffold_b):
+        if name not in BUILTIN_SCAFFOLDS:
+            typer.echo(
+                f"unknown scaffold {name!r}; built-ins: {', '.join(BUILTIN_SCAFFOLDS)}", err=True
+            )
+            raise typer.Exit(2)
+
+    try:
+        tasks = load_suite("swe-bench-verified", subset_size=subset or 0)
+        patch_model = AnthropicPatchModel(model=model or DEFAULT_MODEL)
+        evaluator = SubprocessSweEvaluator(
+            run_dir=out_dir / "swebench", max_workers=max_workers
+        )
+        version = suite_version_for("swe-bench-verified", subset_size=subset or 0)
+        ref = run_scaffold(
+            tasks,
+            scaffold=BUILTIN_SCAFFOLDS[scaffold_a](),
+            model=patch_model,
+            evaluator=evaluator,
+            n=n,
+            seed=seed,
+            branch="bench",
+            suite_version=version,
+        )
+        cand = run_scaffold(
+            tasks,
+            scaffold=BUILTIN_SCAFFOLDS[scaffold_b](),
+            model=patch_model,
+            evaluator=evaluator,
+            n=n,
+            seed=seed,
+            branch="bench",
+            suite_version=version,
+        )
+    except (BenchmarkDataUnavailable, BenchDependencyMissing) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2) from exc
+
+    comparison = compare_scaffolds(ref, cand, k=k)
+    report = render_benchmark_report(ref, cand, comparison, k=k, subset_label=f"{version}")
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / f"{scaffold_a}.json").write_text(
+        json.dumps(ref.to_dict(), indent=2), encoding="utf-8"
+    )
+    (out_dir / f"{scaffold_b}.json").write_text(
+        json.dumps(cand.to_dict(), indent=2), encoding="utf-8"
+    )
+    (out_dir / "report.md").write_text(report + "\n", encoding="utf-8")
+
+    typer.echo(report)
+    typer.echo(f"\nWritten to {out_dir}")
