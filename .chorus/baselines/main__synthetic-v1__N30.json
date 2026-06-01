@@ -1,0 +1,131 @@
+{
+  "suite_version": "synthetic-v1",
+  "branch": "main",
+  "n": 30,
+  "seed": 7,
+  "seed_policy": "per-lane",
+  "scaffold": "baseline",
+  "commit": "5c9949f",
+  "tasks": [
+    {
+      "task_id": "bench.parse_args",
+      "n": 30,
+      "passes": 27,
+      "mean_cost_usd": 0.053554833333333336,
+      "failure_breakdown": {
+        "contract_violation": 1,
+        "tool_error": 2
+      }
+    },
+    {
+      "task_id": "bench.format_table",
+      "n": 30,
+      "passes": 25,
+      "mean_cost_usd": 0.05740096666666667,
+      "failure_breakdown": {
+        "contract_violation": 4,
+        "tool_error": 1
+      }
+    },
+    {
+      "task_id": "bench.retry_backoff",
+      "n": 30,
+      "passes": 24,
+      "mean_cost_usd": 0.05231836666666667,
+      "failure_breakdown": {
+        "contract_violation": 4,
+        "tool_error": 2
+      }
+    },
+    {
+      "task_id": "bench.merge_configs",
+      "n": 30,
+      "passes": 24,
+      "mean_cost_usd": 0.057956099999999997,
+      "failure_breakdown": {
+        "contract_violation": 4,
+        "tool_error": 2
+      }
+    },
+    {
+      "task_id": "bench.paginate_api",
+      "n": 30,
+      "passes": 24,
+      "mean_cost_usd": 0.054099633333333334,
+      "failure_breakdown": {
+        "contract_violation": 6
+      }
+    },
+    {
+      "task_id": "bench.resolve_imports",
+      "n": 30,
+      "passes": 19,
+      "mean_cost_usd": 0.05473753333333333,
+      "failure_breakdown": {
+        "tool_error": 3,
+        "contract_violation": 8
+      }
+    },
+    {
+      "task_id": "bench.dedup_records",
+      "n": 30,
+      "passes": 19,
+      "mean_cost_usd": 0.05463083333333333,
+      "failure_breakdown": {
+        "tool_error": 3,
+        "nondeterministic_loop": 1,
+        "contract_violation": 7
+      }
+    },
+    {
+      "task_id": "bench.rate_limiter",
+      "n": 30,
+      "passes": 16,
+      "mean_cost_usd": 0.060004833333333334,
+      "failure_breakdown": {
+        "contract_violation": 6,
+        "tool_error": 8
+      }
+    },
+    {
+      "task_id": "bench.schema_migrate",
+      "n": 30,
+      "passes": 13,
+      "mean_cost_usd": 0.05815206666666666,
+      "failure_breakdown": {
+        "contract_violation": 13,
+        "tool_error": 4
+      }
+    },
+    {
+      "task_id": "bench.async_cancel",
+      "n": 30,
+      "passes": 17,
+      "mean_cost_usd": 0.056459100000000005,
+      "failure_breakdown": {
+        "contract_violation": 10,
+        "tool_error": 3
+      }
+    },
+    {
+      "task_id": "bench.lock_ordering",
+      "n": 30,
+      "passes": 14,
+      "mean_cost_usd": 0.057919866666666674,
+      "failure_breakdown": {
+        "contract_violation": 15,
+        "tool_error": 1
+      }
+    },
+    {
+      "task_id": "bench.race_condition",
+      "n": 30,
+      "passes": 14,
+      "mean_cost_usd": 0.050272166666666666,
+      "failure_breakdown": {
+        "contract_violation": 13,
+        "tool_error": 3
+      }
+    }
+  ]
+}

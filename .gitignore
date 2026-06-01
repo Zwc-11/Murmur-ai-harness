@@ -1,7 +1,13 @@
 # Local files that should not be committed.
 # These are build outputs, caches, virtual environments, and private env files.
 .venv/
-.chorus/
+# Ignore local run artifacts under .chorus/, but allow a committed baseline so the
+# reliability gate can compare against it without an Actions cache (the mode the
+# composite action documents: "commit .chorus/baselines/ on the base branch").
+.chorus/*
+!.chorus/baselines/
+.chorus/baselines/*
+!.chorus/baselines/*.json
 __pycache__/
 .pytest_cache/
 .ruff_cache/
