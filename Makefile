@@ -2,7 +2,7 @@
 # These targets wrap the exact Python commands we expect contributors to run.
 PYTHON ?= python
 
-.PHONY: install test lint format demo replay run trace gate
+.PHONY: install test lint format demo replay run trace gate langsmith
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -31,3 +31,7 @@ trace:
 gate:
 	chorus gate --branch main --n 20 --update-baseline
 	chorus gate --branch main --n 20 --scaffold worse --success-delta -0.12 --error-rate 0.12
+
+# Needs the [otel] extra + LANGSMITH_API_KEY. See docs/LANGSMITH_MCP_LOOP.md.
+langsmith:
+	chorus trace --n 12 --seed 7 --otlp --backend langsmith --project chorus
