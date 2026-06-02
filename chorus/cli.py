@@ -164,6 +164,9 @@ def trace(
     otlp: Annotated[bool, typer.Option(help="Also export spans over OTLP.")] = False,
     backend: Annotated[str, typer.Option(help="OTLP backend: phoenix | langsmith.")] = "phoenix",
     endpoint: Annotated[str | None, typer.Option(help="Override the OTLP endpoint URL.")] = None,
+    project: Annotated[
+        str, typer.Option(help="LangSmith project name (sets LANGSMITH_PROJECT).")
+    ] = "",
 ) -> None:
     """Record a run, project it into gen_ai.* spans, and write the trace viewer."""
 
@@ -205,16 +208,35 @@ def trace(
     typer.echo(f"\nTrace viewer written to {out}  (open in a browser)")
 
     if otlp:
-        from chorus.adapters.trace.otlp import OtelNotInstalled, build_otlp_trace_port
+        from chorus.adapters.trace.otlp import (
+            OtelNotInstalled,
+            build_otlp_trace_port,
+            langsmith_project_url,
+        )
         from chorus.trace.emit import emit_traces
 
+        if backend == "langsmith":
+            if project:
+                os.environ["LANGSMITH_PROJECT"] = project
+            if not os.environ.get("LANGSMITH_API_KEY"):
+                typer.echo(
+                    "LANGSMITH_API_KEY is not set; the LangSmith export will be rejected (401). "
+                    "Set it and re-run.",
+                    err=True,
+                )
         try:
             port = build_otlp_trace_port(backend=backend, endpoint=endpoint)
             emit_traces(traces, port)
-            typer.echo(f"Exported {len(traces)} traces over OTLP to {backend}.")
         except OtelNotInstalled as exc:
             typer.echo(str(exc), err=True)
             raise typer.Exit(2) from exc
+        typer.echo(f"Exported {len(traces)} traces over OTLP to {backend}.")
+        if backend == "langsmith":
+            resolved_project = os.environ.get("LANGSMITH_PROJECT", "chorus")
+            typer.echo(
+                f"Open LangSmith project {resolved_project!r}: "
+                f"{langsmith_project_url(resolved_project)}"
+            )
 
 
 @app.command()
@@ -454,9 +476,7 @@ def bench(
     try:
         tasks = load_suite("swe-bench-verified", subset_size=subset or 0)
         patch_model = AnthropicPatchModel(model=model or DEFAULT_MODEL)
-        evaluator = SubprocessSweEvaluator(
-            run_dir=out_dir / "swebench", max_workers=max_workers
-        )
+        evaluator = SubprocessSweEvaluator(run_dir=out_dir / "swebench", max_workers=max_workers)
         version = suite_version_for("swe-bench-verified", subset_size=subset or 0)
         ref = run_scaffold(
             tasks,
