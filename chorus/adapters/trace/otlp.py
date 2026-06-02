@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from urllib.parse import quote
 
 # Pinned GenAI semantic-convention opt-in (the spec is still in Development).
 SEMCONV_OPT_IN = "gen_ai_latest_experimental"
@@ -23,6 +24,15 @@ _BACKEND_DEFAULTS = {
     "phoenix": "http://localhost:6006/v1/traces",
     "langsmith": "https://api.smith.langchain.com/otel/v1/traces",
 }
+
+# LangSmith web app (the loop's first hop: open the project the run landed in).
+LANGSMITH_APP_URL = "https://smith.langchain.com"
+
+
+def langsmith_project_url(project: str) -> str:
+    """A LangSmith projects-list URL filtered to ``project`` (default-org shortcut)."""
+
+    return f"{LANGSMITH_APP_URL}/o/-/projects?searchValue={quote(project)}"
 
 
 class OtelNotInstalled(RuntimeError):

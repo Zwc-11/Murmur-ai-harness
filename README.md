@@ -134,6 +134,23 @@ chorus trace --n 30 --seed 7 --replay
 `--replay` re-executes every recorded trajectory through the replay gateway and
 confirms each reproduces exactly, marking the spans `chorus.replay=true`.
 
+Export the trace to LangSmith and close the MCP self-debug loop (Phase 6):
+
+```bash
+pip install -e ".[otel]"
+export LANGSMITH_API_KEY=ls-...
+chorus trace --n 12 --seed 7 --otlp --backend langsmith --project chorus
+```
+
+The same `gen_ai.*` spans the local viewer renders are exported over OTLP to
+LangSmith (content capture stays off by default). The repo ships a
+[`.mcp.json`](.mcp.json) wiring the official LangSmith MCP server, so a coding agent
+can pull the run's trace back and debug Chorus from it — the "write → trace → debug"
+loop closed on Chorus itself. Full runbook:
+[docs/LANGSMITH_MCP_LOOP.md](docs/LANGSMITH_MCP_LOOP.md). The exporter, CLI, and
+`.mcp.json` are in the repo and tested; the live export + MCP debugging need a
+LangSmith account (documented, never faked).
+
 Gate CI on a *statistical* regression (Phase 5):
 
 ```bash
