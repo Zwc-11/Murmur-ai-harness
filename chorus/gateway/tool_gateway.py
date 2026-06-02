@@ -204,6 +204,57 @@ class ToolGateway:
             return await self._record_call(name, args)
         return self._replay_call(name, args)
 
+    async def record_tool(
+        self,
+        name: str,
+        args: dict[str, Any],
+        *,
+        result: Any = None,
+        error: str | None = None,
+        error_type: str | None = None,
+        latency_ms: float = 0.0,
+    ) -> None:
+        """Log a tool the agent already executed *itself* -- the observational path.
+
+        Unlike :meth:`call`, this never runs anything: it records an
+        already-completed external tool call as ``TOOL_CALL`` + ``TOOL_RESULT`` so a
+        wrapped third-party agent (LangGraph, Claude Code, ...) still produces the
+        divergence signature and the failure diagnosis. Recording only -- replay is
+        not supported for externally driven tools, so it is a no-op in replay mode.
+        """
+
+        if self._mode != GatewayMode.RECORD:
+            return
+        if self._recorder is None:
+            raise RuntimeError("record mode requires an event recorder")
+        self._tool_call_count += 1
+        self._latency_ms += latency_ms
+        command_hash = hash_payload({"tool": name, "args": args})
+        await self._recorder.emit(
+            EventType.TOOL_CALL,
+            {"tool": name, "args": args, "command_hash": command_hash},
+        )
+        if error is not None:
+            await self._recorder.emit(
+                EventType.TOOL_RESULT,
+                {
+                    "tool": name,
+                    "error": error,
+                    "error_type": error_type or "ToolError",
+                    "latency_ms": latency_ms,
+                },
+            )
+        else:
+            await self._recorder.emit(
+                EventType.TOOL_RESULT,
+                {
+                    "tool": name,
+                    "result": result,
+                    "result_hash": hash_payload(result),
+                    "latency_ms": latency_ms,
+                },
+            )
+
     async def _record_model(
         self,
         *,
