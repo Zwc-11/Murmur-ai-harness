@@ -79,10 +79,15 @@ Drive the loop from inside the coding agent, for example:
 > diverges or `chorus.failure.class` is set, and trace it back to the Chorus source
 > that produced that span."
 
-Because every span carries `chorus.run.id`, `chorus.trajectory.id`,
-`chorus.step.index/phase`, and (on failures) `chorus.failure.class` /
-`chorus.failure.step`, the agent can map a LangSmith span straight to the event in
-`.chorus/trace.jsonl` and the code path that emitted it — then propose the fix.
+The exporter translates Chorus attributes into LangSmith's OTEL conventions, so in
+LangSmith each run carries `metadata.chorus.run.id`, `metadata.chorus.trajectory.id`,
+`metadata.chorus.step.phase`, and (on failures) `metadata.chorus.failure.class` /
+`metadata.chorus.failure.step` — and **failed/errored trajectories are marked as
+error runs** (via an OTel exception event). So the agent can filter the project to
+error runs, read the failure class and step from metadata, and map a LangSmith span
+straight to the event in `.chorus/trace.jsonl` and the code path that emitted it —
+then propose the fix. (Verified live: a 20-trajectory export landed 11 error runs,
+each tagged e.g. `chorus.failure.class=contract_violation`, `failure.step=5`.)
 
 ## 4. Close the loop
 

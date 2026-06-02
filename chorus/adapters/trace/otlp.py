@@ -35,6 +35,34 @@ def langsmith_project_url(project: str) -> str:
     return f"{LANGSMITH_APP_URL}/o/-/projects?searchValue={quote(project)}"
 
 
+# LangSmith reads only its own OTEL attribute conventions: arbitrary attributes are
+# dropped, custom metadata needs the langsmith.metadata.* prefix, and the run type
+# comes from langsmith.span.kind. Chorus span kinds map to LangSmith run types here.
+_LANGSMITH_KIND = {
+    "run": "chain",
+    "step": "chain",
+    "model": "llm",
+    "tool": "tool",
+    "contract": "chain",
+}
+
+
+def langsmith_attributes(kind: str, attrs: dict[str, Any]) -> dict[str, Any]:
+    """Translate Chorus span attributes into LangSmith's OTEL conventions.
+
+    ``chorus.*`` attributes are mirrored under ``langsmith.metadata.*`` so they land
+    in the run's metadata (queryable in the MCP loop); the span kind becomes
+    ``langsmith.span.kind`` (the run type). ``gen_ai.*`` attributes are left alone --
+    LangSmith ingests those natively.
+    """
+
+    extra: dict[str, Any] = {"langsmith.span.kind": _LANGSMITH_KIND.get(kind, "chain")}
+    for key, value in attrs.items():
+        if key.startswith("chorus."):
+            extra[f"langsmith.metadata.{key}"] = value
+    return extra
+
+
 class OtelNotInstalled(RuntimeError):
     """Raised when the optional OpenTelemetry packages are not available."""
 
@@ -100,36 +128,62 @@ def build_otlp_trace_port(
     exporter = OTLPSpanExporter(endpoint=resolved_endpoint, headers=resolved_headers)
     provider.add_span_processor(BatchSpanProcessor(exporter))
     tracer = provider.get_tracer("chorus.trace")
-    return OtlpTracePort(tracer=tracer, provider=provider, context=context, trace=trace)
+    return OtlpTracePort(
+        tracer=tracer,
+        provider=provider,
+        context=context,
+        trace=trace,
+        langsmith=backend == "langsmith",
+    )
 
 
 class OtlpTracePort:
-    """``TracePort`` that opens/closes real OTel spans with correct nesting."""
+    """``TracePort`` that opens/closes real OTel spans with correct nesting.
 
-    def __init__(self, *, tracer: Any, provider: Any, context: Any, trace: Any) -> None:
+    When ``langsmith`` is set, span attributes are translated into LangSmith's OTEL
+    conventions (``langsmith.metadata.*``, ``langsmith.span.kind``) and error spans
+    record an ``exception`` event -- LangSmith derives a run's error status from that
+    event, not from the OTel status code alone.
+    """
+
+    def __init__(
+        self, *, tracer: Any, provider: Any, context: Any, trace: Any, langsmith: bool = False
+    ) -> None:
         self._tracer = tracer
         self._provider = provider
         self._context = context
         self._trace = trace
-        self._stack: list[tuple[Any, Any]] = []
+        self._langsmith = langsmith
+        self._stack: list[tuple[Any, Any, dict[str, Any]]] = []
 
     def start_span(self, name: str, *, kind: str, attrs: dict[str, Any]) -> None:
-        span = self._tracer.start_span(name, attributes=_otel_attrs(attrs))
+        span_attrs = dict(attrs)
+        if self._langsmith:
+            span_attrs.update(langsmith_attributes(kind, attrs))
+        span = self._tracer.start_span(name, attributes=_otel_attrs(span_attrs))
         token = self._context.attach(self._trace.set_span_in_context(span))
-        self._stack.append((span, token))
+        self._stack.append((span, token, attrs))
 
     def set_status(self, status: str) -> None:
         if not self._stack:
             return
-        span, _ = self._stack[-1]
+        span, _, attrs = self._stack[-1]
         codes = self._trace.StatusCode
-        status_code = codes.ERROR if status == "error" else codes.OK
-        span.set_status(self._trace.Status(status_code))
+        span.set_status(self._trace.Status(codes.ERROR if status == "error" else codes.OK))
+        if status == "error" and self._langsmith:
+            message = attrs.get("chorus.tool.error") or attrs.get("chorus.failure.class") or "error"
+            etype = (
+                attrs.get("chorus.tool.error_type") or attrs.get("chorus.failure.class") or "Error"
+            )
+            span.add_event(
+                "exception",
+                {"exception.message": str(message), "exception.type": str(etype)},
+            )
 
     def end_span(self) -> None:
         if not self._stack:
             return
-        span, token = self._stack.pop()
+        span, token, _ = self._stack.pop()
         self._context.detach(token)
         span.end()
 
