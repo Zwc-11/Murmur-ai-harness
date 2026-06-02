@@ -35,6 +35,13 @@ bench = [
   "datasets>=2.20",
   "swebench>=2.1",
 ]
+# Real third-party agent adapters (Phase 6). The LangGraph AgentPort adapter reads
+# the standard astream_events stream and needs nothing at import time; install this
+# to build/run a real LangGraph agent through `LangGraphAgent.from_react_agent`.
+agents = [
+  "langgraph>=0.2",
+  "langchain-anthropic>=0.2",
+]
 
 [project.scripts]
 chorus = "chorus.cli:app"

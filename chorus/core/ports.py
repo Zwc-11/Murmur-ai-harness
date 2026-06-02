@@ -18,6 +18,18 @@ class ToolGatewayPort(Protocol):
     async def call(self, name: str, args: dict[str, Any]) -> Any:
         """Call a tool through the single record/replay choke point."""
 
+    async def record_tool(
+        self,
+        name: str,
+        args: dict[str, Any],
+        *,
+        result: Any = ...,
+        error: str | None = ...,
+        error_type: str | None = ...,
+        latency_ms: float = ...,
+    ) -> None:
+        """Record a tool the agent executed itself (observational adapters)."""
+
     async def step(
         self,
         *,
