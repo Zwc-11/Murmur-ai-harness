@@ -18,6 +18,7 @@ from chorus.adapters.trace.otlp import (
     LANGSMITH_APP_URL,
     _langsmith_headers,
     build_otlp_trace_port,
+    langsmith_attributes,
     langsmith_project_url,
 )
 from chorus.core.conductor import RunConductor
@@ -60,6 +61,30 @@ def test_project_url_is_well_formed_and_encoded() -> None:
     assert "my%20proj" in url  # the project name is URL-encoded
 
 
+def test_langsmith_attributes_mirror_chorus_to_metadata_and_kind() -> None:
+    # LangSmith drops raw attributes; chorus.* must be mirrored under
+    # langsmith.metadata.* and the span kind sent as langsmith.span.kind.
+    out = langsmith_attributes(
+        "model",
+        {
+            "chorus.run.id": "run_x",
+            "chorus.failure.class": "tool_error",
+            "gen_ai.request.model": "m",
+        },
+    )
+    assert out["langsmith.span.kind"] == "llm"
+    assert out["langsmith.metadata.chorus.run.id"] == "run_x"
+    assert out["langsmith.metadata.chorus.failure.class"] == "tool_error"
+    # gen_ai.* is ingested natively, never mirrored into metadata.
+    assert not any(key.endswith("gen_ai.request.model") for key in out)
+
+
+def test_langsmith_kind_maps_run_types() -> None:
+    assert langsmith_attributes("tool", {})["langsmith.span.kind"] == "tool"
+    assert langsmith_attributes("run", {})["langsmith.span.kind"] == "chain"
+    assert langsmith_attributes("contract", {})["langsmith.span.kind"] == "chain"
+
+
 def test_export_pipeline_emits_balanced_gen_ai_spans() -> None:
     # The exact path LangSmith receives: events -> traces -> emit -> TracePort.
     store = InMemoryEventStore()
@@ -85,8 +110,7 @@ def test_export_pipeline_emits_balanced_gen_ai_spans() -> None:
 def test_build_langsmith_port_constructs_when_otel_present() -> None:
     if importlib.util.find_spec("opentelemetry") is None:  # pragma: no cover - extra absent
         return  # the [otel] extra is not installed; construction is a Tier-B/live concern
+    # Construct only -- do not emit spans, so the test never touches the network.
     port = build_otlp_trace_port(backend="langsmith")
-    # Buffer a span without flushing -- exercises construction with no network.
-    port.start_span("agent.run", kind="run", attrs={"gen_ai.operation.name": "invoke_agent"})
-    port.set_status("ok")
-    port.end_span()
+    assert port._langsmith is True
+    assert build_otlp_trace_port(backend="phoenix")._langsmith is False
