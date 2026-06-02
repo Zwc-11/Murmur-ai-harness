@@ -22,7 +22,7 @@ from chorus.adapters.agents.stochastic import stochastic_agent_factory, stochast
 from chorus.adapters.storage.baseline import BaselineStore
 from chorus.adapters.storage.jsonl import JsonlEventStore
 from chorus.benchmarks.loader import load_suite, suite_version_for
-from chorus.benchmarks.scaffold import Scaffold, run_judged_suite, run_suite
+from chorus.benchmarks.scaffold import Scaffold, run_suite
 from chorus.benchmarks.swe.types import BenchDependencyMissing
 from chorus.benchmarks.swebench import BenchmarkDataUnavailable
 from chorus.core.conductor import RunConductor
@@ -291,15 +291,20 @@ async def _run_real_suite(
     n: int,
     seed: int,
     branch: str,
+    trace_html: Path | None = None,
 ):
-    """Build a real SWE-bench AgentPort + JudgePort and run the judged suite.
+    """Build a real SWE-bench AgentPort + JudgePort and run the batched judged suite.
 
-    Preflights the model and evaluator dependencies so a missing API key or Docker
-    fails fast with a clear error instead of silently turning every trajectory into
-    an ``error`` outcome (the conductor swallows agent faults by design).
+    Uses the two-phase batched runner: every agent runs through the conductor (so
+    the run is recorded and traceable), then each attempt's patches are evaluated
+    across all instances in one harness run. Preflights the model and evaluator
+    dependencies so a missing API key or Docker fails fast with a clear error
+    instead of silently turning every trajectory into an ``error`` outcome (the
+    conductor swallows agent faults by design).
     """
 
     from chorus.adapters.agents.swe import SwePatchAgent
+    from chorus.benchmarks.scaffold import run_judged_suite_batched
     from chorus.benchmarks.swe.evaluator import SubprocessSweEvaluator
     from chorus.benchmarks.swe.judge import SweBenchJudge
     from chorus.benchmarks.swe.model import DEFAULT_MODEL, AnthropicPatchModel
@@ -314,7 +319,7 @@ async def _run_real_suite(
     def agent_factory(lane_seed: int) -> SwePatchAgent:
         return SwePatchAgent(patch_model, repair=repair, seed=lane_seed)
 
-    return await run_judged_suite(
+    run = await run_judged_suite_batched(
         tasks,
         agent_factory=agent_factory,
         judge=SweBenchJudge(evaluator),
@@ -325,6 +330,23 @@ async def _run_real_suite(
         scaffold="self-repair" if repair else "single-shot",
         commit=_detect_commit(),
     )
+    if trace_html is not None:
+        _write_swe_trace(run, trace_html)
+    return run.suite
+
+
+def _write_swe_trace(run, path: Path) -> None:
+    """Project the recorded SWE-bench run into the gen_ai.* trace viewer."""
+
+    from chorus.report.trace_html import write_traces_html
+    from chorus.trace.mapper import events_to_traces
+
+    traces = []
+    for events in run.events.values():
+        traces.extend(events_to_traces(events))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_traces_html(traces, path, run_id=f"swe::{run.suite.scaffold}")
+    typer.echo(f"Trace viewer written to {path}  (open in a browser)")
 
 
 @app.command()
@@ -361,6 +383,9 @@ def gate(
         ),
     ] = False,
     model: Annotated[str, typer.Option(help="Model id for --real-agent.")] = "",
+    trace_html: Annotated[
+        Path, typer.Option(help="With --real-agent: write the SWE-bench trace viewer here.")
+    ] = Path(".chorus/swe-trace.html"),
 ) -> None:
     """Run the suite and gate on a *statistical* regression vs the stored baseline."""
 
@@ -392,6 +417,7 @@ def gate(
                     n=n,
                     seed=seed,
                     branch=resolved_branch,
+                    trace_html=trace_html,
                 )
             )
         else:
