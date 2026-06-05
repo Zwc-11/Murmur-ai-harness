@@ -10,10 +10,10 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 
-from chorus.adapters.agents.stochastic import stochastic_agent_factory, stochastic_tools
-from chorus.adapters.storage.memory import InMemoryEventStore
-from chorus.adapters.trace.memory import InMemoryTraceCollector
-from chorus.adapters.trace.otlp import (
+from murmur.adapters.agents.stochastic import stochastic_agent_factory, stochastic_tools
+from murmur.adapters.storage.memory import InMemoryEventStore
+from murmur.adapters.trace.memory import InMemoryTraceCollector
+from murmur.adapters.trace.otlp import (
     _BACKEND_DEFAULTS,
     LANGSMITH_APP_URL,
     _CountingSpanExporter,
@@ -23,15 +23,15 @@ from chorus.adapters.trace.otlp import (
     langsmith_attributes,
     langsmith_project_url,
 )
-from chorus.core.conductor import RunConductor
-from chorus.core.types import TaskSpec
-from chorus.trace.emit import emit_traces
-from chorus.trace.mapper import events_to_traces
+from murmur.core.conductor import RunConductor
+from murmur.core.types import TaskSpec
+from murmur.trace.emit import emit_traces
+from murmur.trace.mapper import events_to_traces
 
 TASK = TaskSpec(
     task_id="demo.echo_uppercase",
-    prompt="hello chorus",
-    expected_output="HELLO CHORUS",
+    prompt="hello murmur",
+    expected_output="HELLO MURMUR",
 )
 
 
@@ -68,20 +68,20 @@ def test_phoenix_metrics_endpoint_is_derived_from_trace_endpoint() -> None:
     assert _metrics_endpoint("http://collector/custom") == "http://collector/custom"
 
 
-def test_langsmith_attributes_mirror_chorus_to_metadata_and_kind() -> None:
-    # LangSmith drops raw attributes; chorus.* must be mirrored under
+def test_langsmith_attributes_mirror_murmur_to_metadata_and_kind() -> None:
+    # LangSmith drops raw attributes; murmur.* must be mirrored under
     # langsmith.metadata.* and the span kind sent as langsmith.span.kind.
     out = langsmith_attributes(
         "model",
         {
-            "chorus.run.id": "run_x",
-            "chorus.failure.class": "tool_error",
+            "murmur.run.id": "run_x",
+            "murmur.failure.class": "tool_error",
             "gen_ai.request.model": "m",
         },
     )
     assert out["langsmith.span.kind"] == "llm"
-    assert out["langsmith.metadata.chorus.run.id"] == "run_x"
-    assert out["langsmith.metadata.chorus.failure.class"] == "tool_error"
+    assert out["langsmith.metadata.murmur.run.id"] == "run_x"
+    assert out["langsmith.metadata.murmur.failure.class"] == "tool_error"
     # gen_ai.* is ingested natively, never mirrored into metadata.
     assert not any(key.endswith("gen_ai.request.model") for key in out)
 

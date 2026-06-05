@@ -13,8 +13,8 @@ import json
 
 import pytest
 
-from chorus.benchmarks.loader import load_suite, suite_version_for
-from chorus.benchmarks.swebench import (
+from murmur.benchmarks.loader import load_suite, suite_version_for
+from murmur.benchmarks.swebench import (
     BenchmarkDataUnavailable,
     load_swebench_verified,
     resolve_subset_size,
@@ -81,13 +81,13 @@ def test_missing_data_source_raises_actionable_error(tmp_path) -> None:
     missing = tmp_path / "nope.jsonl"
     with pytest.raises(BenchmarkDataUnavailable) as exc:
         load_swebench_verified(path=missing)
-    assert "CHORUS_SWEBENCH_PATH" in str(exc.value)
+    assert "MURMUR_SWEBENCH_PATH" in str(exc.value)
 
 
 def test_load_suite_routes_to_swebench(tmp_path, monkeypatch) -> None:
     path = _write_jsonl(tmp_path, [_instance("routed-1")])
-    monkeypatch.setenv("CHORUS_SWEBENCH_PATH", str(path))
-    monkeypatch.setenv("CHORUS_SWEBENCH_SUBSET", "0")  # full set
+    monkeypatch.setenv("MURMUR_SWEBENCH_PATH", str(path))
+    monkeypatch.setenv("MURMUR_SWEBENCH_SUBSET", "0")  # full set
 
     tasks = load_suite("swe-bench-verified")
     assert [t.task_id for t in tasks] == ["routed-1"]
@@ -101,10 +101,10 @@ def test_suite_version_keys_keep_baselines_separate() -> None:
 
 
 def test_resolve_subset_size_env_override(monkeypatch) -> None:
-    monkeypatch.delenv("CHORUS_SWEBENCH_SUBSET", raising=False)
+    monkeypatch.delenv("MURMUR_SWEBENCH_SUBSET", raising=False)
     assert resolve_subset_size(None) == 50  # default
     assert resolve_subset_size(10) == 10  # explicit wins
-    monkeypatch.setenv("CHORUS_SWEBENCH_SUBSET", "5")
+    monkeypatch.setenv("MURMUR_SWEBENCH_SUBSET", "5")
     assert resolve_subset_size(None) == 5
-    monkeypatch.setenv("CHORUS_SWEBENCH_SUBSET", "0")
+    monkeypatch.setenv("MURMUR_SWEBENCH_SUBSET", "0")
     assert resolve_subset_size(None) is None  # 0 -> full set

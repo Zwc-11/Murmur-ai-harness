@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import asyncio
 
-from chorus.adapters.storage.memory import InMemoryEventStore
-from chorus.core.classify import FailurePolicy, classify_trajectory, validate_classifier
-from chorus.core.conductor import RunConductor
-from chorus.core.events import Event, EventType
-from chorus.core.ports import ToolGatewayPort
-from chorus.core.types import StepBoundaryContract, TaskSpec
+from murmur.adapters.storage.memory import InMemoryEventStore
+from murmur.core.classify import FailurePolicy, classify_trajectory, validate_classifier
+from murmur.core.conductor import RunConductor
+from murmur.core.events import Event, EventType
+from murmur.core.ports import ToolGatewayPort
+from murmur.core.types import StepBoundaryContract, TaskSpec
 
 TASK = TaskSpec(
     task_id="demo.echo_uppercase",
-    prompt="hello chorus",
-    expected_output="HELLO CHORUS",
+    prompt="hello murmur",
+    expected_output="HELLO MURMUR",
 )
 
 
@@ -31,8 +31,8 @@ class SchemaMismatchAgent:
 def test_step_boundary_schema_mismatch_fails_and_is_stamped() -> None:
     task = TaskSpec(
         task_id="demo.schema",
-        prompt="hello chorus",
-        expected_output="HELLO CHORUS",
+        prompt="hello murmur",
+        expected_output="HELLO MURMUR",
         step_contracts={
             0: StepBoundaryContract(
                 output_schema={
@@ -79,14 +79,14 @@ class BadWebsiteAgent:
     async def run(self, task: TaskSpec, gateway: ToolGatewayPort) -> str:
         await gateway.step(index=0, phase="write")
         return (
-            '<!DOCTYPE html><html><body><h1>chorus</h1><section id="metrics">'
+            '<!DOCTYPE html><html><body><h1>murmur</h1><section id="metrics">'
             "pass@1 pass@k variance</section></body></html>"
             "<style>:root{--accent:#e8192a}</style>"
         )
 
 
 def test_final_contract_check_carries_structured_diagnostics() -> None:
-    from chorus.core.agent_tasks import hard_website_task
+    from murmur.core.agent_tasks import hard_website_task
 
     store = InMemoryEventStore()
     conductor = RunConductor(agent=BadWebsiteAgent(), storage=store, tools={})

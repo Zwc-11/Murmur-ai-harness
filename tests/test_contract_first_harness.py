@@ -7,11 +7,11 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from chorus.application.contract_compiler import compile_fix_test_contract
-from chorus.cli import app
-from chorus.domain.contract import Contract
-from chorus.domain.policy import BudgetState, PolicyEngine
-from chorus.domain.tool import ToolRequest
+from murmur.application.contract_compiler import compile_fix_test_contract
+from murmur.cli import app
+from murmur.domain.contract import Contract
+from murmur.domain.policy import BudgetState, PolicyEngine
+from murmur.domain.tool import ToolRequest
 
 
 def test_contract_yaml_roundtrip_and_validation(tmp_path: Path) -> None:
@@ -89,7 +89,7 @@ def test_fix_test_scripted_agent_writes_pr_proof(tmp_path: Path) -> None:
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
             "--agent",
             "scripted",
             "--budget",
@@ -98,7 +98,7 @@ def test_fix_test_scripted_agent_writes_pr_proof(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    run_dirs = list((tmp_path / ".chorus" / "runs").glob("run_*"))
+    run_dirs = list((tmp_path / ".murmur" / "runs").glob("run_*"))
     assert len(run_dirs) == 1
     run_dir = run_dirs[0]
     assert (run_dir / "contract.yaml").is_file()
@@ -123,14 +123,14 @@ def test_failure_not_reproduced_exits_nonzero_with_proof(tmp_path: Path) -> None
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
             "--agent",
             "scripted",
         ],
     )
 
     assert result.exit_code == 1
-    proof = next((tmp_path / ".chorus" / "runs").glob("run_*/proof.md"))
+    proof = next((tmp_path / ".murmur" / "runs").glob("run_*/proof.md"))
     assert "failure_not_reproduced" in proof.read_text(encoding="utf-8")
 
 
