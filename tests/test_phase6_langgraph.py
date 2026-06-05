@@ -10,19 +10,19 @@ from __future__ import annotations
 
 import asyncio
 
-from chorus.adapters.agents.langgraph import LangGraphAgent
-from chorus.adapters.storage.memory import InMemoryEventStore
-from chorus.core.classify import classify_trajectory
-from chorus.core.conductor import RunConductor
-from chorus.core.events import EventRecorder, EventType
-from chorus.core.types import TaskSpec
-from chorus.gateway.tool_gateway import ToolGateway
-from chorus.trace.mapper import events_to_traces
+from murmur.adapters.agents.langgraph import LangGraphAgent
+from murmur.adapters.storage.memory import InMemoryEventStore
+from murmur.core.classify import classify_trajectory
+from murmur.core.conductor import RunConductor
+from murmur.core.events import EventRecorder, EventType
+from murmur.core.types import TaskSpec
+from murmur.gateway.tool_gateway import ToolGateway
+from murmur.trace.mapper import events_to_traces
 
 TASK = TaskSpec(
     task_id="demo.echo_uppercase",
-    prompt="hello chorus",
-    expected_output="HELLO CHORUS",
+    prompt="hello murmur",
+    expected_output="HELLO MURMUR",
 )
 
 
@@ -52,7 +52,7 @@ def _react_events():
         # Final answer arrives as Anthropic-style content blocks (list form).
         {
             "event": "on_chat_model_end",
-            "data": {"output": _FakeMessage([{"type": "text", "text": "HELLO CHORUS"}], 120, 8)},
+            "data": {"output": _FakeMessage([{"type": "text", "text": "HELLO MURMUR"}], 120, 8)},
         },
     ]
 
@@ -71,7 +71,7 @@ def test_adapter_records_model_tool_and_step_events() -> None:
     events = list(asyncio.run(store.read_events()))
     kinds = [event.type for event in events]
 
-    assert output == "HELLO CHORUS"  # list-form content is flattened
+    assert output == "HELLO MURMUR"  # list-form content is flattened
     assert kinds.count(EventType.MODEL_CALL) == 2
     assert kinds.count(EventType.TOOL_CALL) == 1
     assert kinds.count(EventType.TOOL_RESULT) == 1
@@ -129,4 +129,4 @@ def test_from_react_agent_requires_the_extra() -> None:
         LangGraphAgent.from_react_agent(object(), [])
         raise AssertionError("expected ImportError without the agents extra")
     except ImportError as exc:
-        assert "chorus-harness[agents]" in str(exc)
+        assert "murmur-harness[agents]" in str(exc)

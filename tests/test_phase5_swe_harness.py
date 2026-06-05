@@ -13,15 +13,15 @@ from pathlib import Path
 
 import pytest
 
-from chorus.benchmarks.swe.evaluator import SubprocessSweEvaluator, parse_report, write_predictions
-from chorus.benchmarks.swe.runner import compare_scaffolds, run_scaffold
-from chorus.benchmarks.swe.scaffold import (
+from murmur.benchmarks.swe.evaluator import SubprocessSweEvaluator, parse_report, write_predictions
+from murmur.benchmarks.swe.runner import compare_scaffolds, run_scaffold
+from murmur.benchmarks.swe.scaffold import (
     SelfRepairScaffold,
     SingleShotScaffold,
     _build_user,
     extract_patch,
 )
-from chorus.benchmarks.swe.types import (
+from murmur.benchmarks.swe.types import (
     EMPTY_PATCH,
     EVAL_ERROR,
     RESOLVED,
@@ -31,9 +31,9 @@ from chorus.benchmarks.swe.types import (
     SweOutcome,
     SwePrediction,
 )
-from chorus.core.types import TaskSpec
-from chorus.report.swe_html import render_benchmark_html
-from chorus.report.swe_md import render_benchmark_report
+from murmur.core.types import TaskSpec
+from murmur.report.swe_html import render_benchmark_html
+from murmur.report.swe_md import render_benchmark_report
 
 
 def _task(task_id: str) -> TaskSpec:
@@ -172,10 +172,10 @@ def test_write_predictions_uses_harness_schema(tmp_path) -> None:
     import json
 
     path = write_predictions(
-        [SwePrediction("inst-1", "DIFF")], tmp_path / "p.jsonl", model_tag="chorus"
+        [SwePrediction("inst-1", "DIFF")], tmp_path / "p.jsonl", model_tag="murmur"
     )
     row = json.loads(path.read_text(encoding="utf-8").strip())
-    assert row == {"instance_id": "inst-1", "model_name_or_path": "chorus", "model_patch": "DIFF"}
+    assert row == {"instance_id": "inst-1", "model_name_or_path": "murmur", "model_patch": "DIFF"}
 
 
 def test_swebench_preflight_explains_native_windows_import_failure(monkeypatch, tmp_path) -> None:
@@ -209,7 +209,7 @@ def test_subprocess_evaluator_passes_absolute_predictions_path(monkeypatch, tmp_
     evaluator = SubprocessSweEvaluator(run_dir=tmp_path / "runs")
     monkeypatch.setattr(evaluator, "_ensure_swebench", lambda: None)
     monkeypatch.setattr(evaluator, "_load_report", lambda run_id: {"resolved_ids": ["inst-1"]})
-    monkeypatch.setattr("chorus.benchmarks.swe.evaluator.subprocess.run", fake_run)
+    monkeypatch.setattr("murmur.benchmarks.swe.evaluator.subprocess.run", fake_run)
 
     outcomes = evaluator.evaluate([SwePrediction("inst-1", "DIFF")], run_id="single-shot__a0")
 
