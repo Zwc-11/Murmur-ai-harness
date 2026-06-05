@@ -10,12 +10,12 @@ import asyncio
 
 import pytest
 
-from chorus.adapters.agents.fake import FakeAgent, fake_tools
-from chorus.adapters.storage.memory import InMemoryEventStore
-from chorus.core.conductor import RunConductor
-from chorus.core.events import EventType
-from chorus.core.types import TaskSpec
-from chorus.gateway.tool_gateway import ReplayDivergenceError
+from murmur.adapters.agents.fake import FakeAgent, fake_tools
+from murmur.adapters.storage.memory import InMemoryEventStore
+from murmur.core.conductor import RunConductor
+from murmur.core.events import EventType
+from murmur.core.types import TaskSpec
+from murmur.gateway.tool_gateway import ReplayDivergenceError
 
 
 def run_async(value):
@@ -31,8 +31,8 @@ def test_dummy_run_records_and_replays() -> None:
     conductor = build_conductor(store)
     task = TaskSpec(
         task_id="demo.echo_uppercase",
-        prompt="hello chorus",
-        expected_output="HELLO CHORUS",
+        prompt="hello murmur",
+        expected_output="HELLO MURMUR",
     )
 
     result = run_async(conductor.run(task, n=2))
@@ -41,7 +41,7 @@ def test_dummy_run_records_and_replays() -> None:
 
     assert result.verdict == "pass"
     assert result.metrics.pass_at_k == 1.0
-    assert replayed == "HELLO CHORUS"
+    assert replayed == "HELLO MURMUR"
     assert EventType.RUN_STARTED in {event.type for event in events}
     assert EventType.TOOL_CALL in {event.type for event in events}
     assert EventType.TOOL_RESULT in {event.type for event in events}
@@ -53,13 +53,13 @@ def test_replay_detects_divergence_when_step_changes() -> None:
     conductor = build_conductor(store)
     recorded_task = TaskSpec(
         task_id="demo.echo_uppercase",
-        prompt="hello chorus",
-        expected_output="HELLO CHORUS",
+        prompt="hello murmur",
+        expected_output="HELLO MURMUR",
     )
     mutated_task = TaskSpec(
         task_id="demo.echo_uppercase",
-        prompt="hello mutated chorus",
-        expected_output="HELLO CHORUS",
+        prompt="hello mutated murmur",
+        expected_output="HELLO MURMUR",
     )
 
     run_async(conductor.run(recorded_task, n=1))

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from chorus.core.acceptance import hard_website_accepts, hard_website_diagnostics, repair_feedback
-from chorus.core.agent_tasks import hard_website_task, load_agent_task
+from murmur.core.acceptance import hard_website_accepts, hard_website_diagnostics, repair_feedback
+from murmur.core.agent_tasks import hard_website_task, load_agent_task
 
 
 def test_hard_website_accepts_valid_bundle() -> None:
     artifact = """=== index.html ===
 <!DOCTYPE html>
-<html><body><h1>chorus</h1><section id="metrics">pass@1 pass^k variance</section></body></html>
+<html><body><h1>murmur</h1><section id="metrics">pass@1 pass^k variance</section></body></html>
 === styles.css ===
 :root { --bg: #e4e4e0; --accent: #e8192a; }
 """
@@ -17,12 +17,12 @@ def test_hard_website_accepts_valid_bundle() -> None:
 
 
 def test_hard_website_rejects_missing_metrics() -> None:
-    assert not hard_website_accepts("<html><body>chorus #e8192a</body></html>")
+    assert not hard_website_accepts("<html><body>murmur #e8192a</body></html>")
 
 
 def test_hard_website_diagnostics_name_missing_predicates() -> None:
     diagnostics = hard_website_diagnostics(
-        '<!DOCTYPE html><html><body><h1>chorus</h1><section id="metrics">'
+        '<!DOCTYPE html><html><body><h1>murmur</h1><section id="metrics">'
         "pass@1 pass@k variance</section></body></html><style>:root{--accent:#e8192a}</style>"
     )
     ids = {diagnostic.predicate_id for diagnostic in diagnostics}
@@ -34,21 +34,21 @@ def test_hard_website_diagnostics_name_missing_predicates() -> None:
 def test_task_spec_uses_acceptance() -> None:
     task = hard_website_task()
     assert task.accepts(
-        """<!DOCTYPE html><html><body><h1>chorus</h1>
+        """<!DOCTYPE html><html><body><h1>murmur</h1>
         <div id="metrics">pass@1 pass^k variance</div></body></html>
         <style>:root { --accent: #e8192a; }</style> index.html styles.css"""
     )
 
 
 def test_load_agent_task_hard_default(monkeypatch) -> None:
-    monkeypatch.delenv("CHORUS_TASK", raising=False)
-    monkeypatch.setenv("CHORUS_TASK", "hard")
+    monkeypatch.delenv("MURMUR_TASK", raising=False)
+    monkeypatch.setenv("MURMUR_TASK", "hard")
     task = load_agent_task()
     assert task.task_id == "hard.landing_site"
 
 
 def test_deepseek_v4_completion_kwargs() -> None:
-    from chorus.benchmarks.swe.model import DeepSeekPatchModel
+    from murmur.benchmarks.swe.model import DeepSeekPatchModel
 
     model = DeepSeekPatchModel(
         model="deepseek-v4-pro",

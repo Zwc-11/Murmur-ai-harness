@@ -1,11 +1,11 @@
 <!--
-This is the repo entrypoint for humans. It explains what Chorus is, what works
+This is the repo entrypoint for humans. It explains what Murmur is, what works
 right now, and the commands needed to install, test, and run the local demo.
 -->
 
-# Chorus
+# Murmur
 
-Chorus is a contract and proof layer for AI-generated code changes. It turns a
+Murmur is a contract and proof layer for AI-generated code changes. It turns a
 coding task into an enforceable engineering contract, runs an agent through
 policy-controlled tools in an isolated workspace, verifies the resulting diff
 with tests and file/diff rules, and emits a PR-ready proof package.
@@ -16,15 +16,21 @@ storage, tracing, judges, and reports plug in through ports.
 
 ## Current slice
 
+It also now includes **Flock** (`murmur.flock`), the self-writing multi-agent
+engine: a planner compiles a task into a typed, schema-validated workflow DAG and
+an async executor runs it by fanning out cheap, isolated subagents — fan-out,
+tournaments, and adversarial verification by default. Try `murmur flock run`
+(offline, no keys) and see [docs/flock.md](docs/flock.md).
+
 This repo now includes the contract-first MVP plus the earlier reliability,
 trace, judgment, and CI-gate machinery from [docs/architecture.md](docs/architecture.md):
 
 - Contract-first `fix-test` execution: reproduce a failing command, compile a
   typed YAML contract, run a policy-controlled agent, verify the diff, and write
   `contract.yaml`, `events.jsonl`, `diff.patch`, `proof.md`, `report.html`, and
-  `summary.json` under `.chorus/runs/<run_id>/`.
-- Contract utility commands: `chorus contract create`, `chorus contract check`,
-  and `chorus run-contract`.
+  `summary.json` under `.murmur/runs/<run_id>/`.
+- Contract utility commands: `murmur contract create`, `murmur contract check`,
+  and `murmur run-contract`.
 - Policy-controlled typed tools: `list_files`, `search`, `read_file`,
   `apply_patch`, `run_test`, `git_diff`, and `finish`; `.env`, secrets,
   destructive shell, network/dependency installs, pushes, and unknown edit paths
@@ -47,21 +53,21 @@ trace, judgment, and CI-gate machinery from [docs/architecture.md](docs/architec
   only for unknown/minority trajectories, cached judge-call helper, escalation
   trace, and cost-ratio measurement harness.
 - Diagnosis: step-boundary schema checks, deterministic-first failure taxonomy,
-  trace stamping with `chorus.failure.class` / `chorus.failure.step`, and
+  trace stamping with `murmur.failure.class` / `murmur.failure.step`, and
   validation metrics for injected failures.
 - Structured contract diagnostics: acceptance checks can now emit stable
   predicate IDs, evidence, and neutral repair hints while preserving the simple
   boolean `task.accepts()` path.
 - Public SDK trace importers: OpenAI Agents SDK-style traces, Claude Code-style
   transcripts/hooks, Google ADK-style traces, and LangGraph event streams can be
-  normalized into the same Chorus event log.
+  normalized into the same Murmur event log.
 - Trajectory-fan visualizer: a terminal view and a standalone HTML/SVG report
   with reliability cards, decay curve, divergence overlay, judgment, and
   diagnosis.
 - Statistical CI gate: a baseline store, a paired-delta bootstrap regression test
   (`regressed` / `improved` / `inconclusive`, seeded and deterministic), a
   per-failure-class PR comment, and a composite GitHub Action wrapping it —
-  [demonstrated blocking a real regression on PR #2](https://github.com/Zwc-11/chorus/pull/2).
+  [demonstrated blocking a real regression on PR #2](https://github.com/Zwc-11/murmur/pull/2).
 - Benchmark seam: a `load_suite` / `Scaffold` interface with two loaders — the
   deterministic synthetic suite, and a real **SWE-bench Verified** loader that maps
   instances to `TaskSpec`s (problem statement → prompt; `FAIL_TO_PASS` /
@@ -71,16 +77,16 @@ trace, judgment, and CI-gate machinery from [docs/architecture.md](docs/architec
   - **Integrated** — `SwePatchAgent` implements the existing `AgentPort` and
     `SweBenchJudge` implements `JudgePort`; the conductor's judge is injectable, so
     a real run flows through the harness and inherits tracing, replay, divergence,
-    and per-step diagnosis (`chorus gate --suite swe-bench-verified --real-agent`).
+    and per-step diagnosis (`murmur gate --suite swe-bench-verified --real-agent`).
     Per-trajectory Docker eval — right for small/debug N.
-  - **Batch** — `chorus bench` evaluates all patches in one parallel harness run for
+  - **Batch** — `murmur bench` evaluates all patches in one parallel harness run for
     the headline number at scale (faster, but not traced).
   Both fold resolved/not into the same `SuiteResult` + `pass^k` machinery the gate
   uses. The wiring is complete and tested with fakes; the numbers need
   `ANTHROPIC_API_KEY` + Docker (see below).
 - CLI commands to record/replay a dummy run, fan out a stochastic run, render
-  trace/fan HTML artifacts, initialize a project (`chorus init`), inspect agent
-  adapter capabilities (`chorus agents list`), gate a candidate against a
+  trace/fan HTML artifacts, initialize a project (`murmur init`), inspect agent
+  adapter capabilities (`murmur agents list`), gate a candidate against a
   baseline, and run the SWE-bench harness-only comparison.
 - Tests proving replay, event-log projection, metric math, divergence detection,
   judgment gating, judge caching, failure classification, the three gate verdicts,
@@ -92,7 +98,7 @@ trace, judgment, and CI-gate machinery from [docs/architecture.md](docs/architec
 Implemented and locally validated:
 
 - `pytest -q`
-- `ruff check chorus tests`
+- `ruff check murmur tests`
 - Free synthetic reliability and regression-gate demos.
 - Offline SWE-bench harness wiring with fake models/evaluators.
 - Public trace importers for observational integration demos.
@@ -100,7 +106,7 @@ Implemented and locally validated:
 Not yet publicly validated:
 
 - A paid SWE/Terminal-style benchmark result with a real frontier model and
-  Docker evaluator. Chorus deliberately exits instead of printing a placeholder
+  Docker evaluator. Murmur deliberately exits instead of printing a placeholder
   number when those dependencies are absent.
 
 Start with [docs/quickstart.md](docs/quickstart.md). For CI wiring, see
@@ -121,16 +127,16 @@ Run the checks:
 
 ```bash
 pytest
-ruff check chorus tests
+ruff check murmur tests
 ```
 
 Run the contract-first MVP on a failing test:
 
 ```bash
-chorus fix-test --cmd "python -m pytest tests/test_checkout.py -q" --budget 0.50
+murmur fix-test --cmd "python -m pytest tests/test_checkout.py -q" --budget 0.50
 ```
 
-This creates `.chorus/runs/<run_id>/contract.yaml`, `events.jsonl`,
+This creates `.murmur/runs/<run_id>/contract.yaml`, `events.jsonl`,
 `diff.patch`, `proof.md`, `report.html`, and `summary.json`. The command fails
 closed if the failure cannot be reproduced or the final diff violates the
 contract.
@@ -138,24 +144,24 @@ contract.
 Run the Phase 0 record/replay demo:
 
 ```bash
-chorus demo --n 3 --event-log .chorus/demo.jsonl
-chorus replay --event-log .chorus/demo.jsonl
-chorus replay --event-log .chorus/demo.jsonl --mutate
+murmur demo --n 3 --event-log .murmur/demo.jsonl
+murmur replay --event-log .murmur/demo.jsonl
+murmur replay --event-log .murmur/demo.jsonl --mutate
 ```
 
 The `--mutate` replay intentionally changes the task prompt and should fail with
-a replay divergence. That is the first proof that Chorus can detect when a
+a replay divergence. That is the first proof that Murmur can detect when a
 trajectory stops matching the recorded path.
 
 Run the Phase 2-4 reliability fan-out:
 
 ```bash
-chorus run --n 30 --success-rate 0.7 --error-rate 0.1 --seed 7
+murmur run --n 30 --success-rate 0.7 --error-rate 0.1 --seed 7
 ```
 
 This fans out a flaky agent `N` times and prints the distribution. The point is
 the gap between `pass@1`, projected `pass^k`, and the empirical unbiased
-`pass^k` curve. A one-shot `pass@1` eval cannot see that gap; Chorus can.
+`pass^k` curve. A one-shot `pass@1` eval cannot see that gap; Murmur can.
 
 ```text
 pass@1            0.80    Wilson95 [0.63, 0.90]
@@ -164,7 +170,7 @@ pass^k empirical  0.0000  (unbiased; 24/30 pass)
 ```
 
 The run is reproducible per `--seed`. It also writes a standalone
-`.chorus/fan.html` report you can open in a browser (no server, no build step):
+`.murmur/fan.html` report you can open in a browser (no server, no build step):
 reliability cards, the projected-vs-empirical `pass^k` decay curve, the
 divergence overlay (the flaky agent shares a fixed opening plan, so the lanes
 stay *converged* until the seed-driven split — divergence at step 4 — making the
@@ -175,25 +181,25 @@ Render the Phase 1 trace viewer (`gen_ai.*` span waterfall + inspector) and
 verify replay:
 
 ```bash
-chorus trace --n 30 --seed 7 --replay
+murmur trace --n 30 --seed 7 --replay
 ```
 
 `--replay` re-executes every recorded trajectory through the replay gateway and
-confirms each reproduces exactly, marking the spans `chorus.replay=true`.
+confirms each reproduces exactly, marking the spans `murmur.replay=true`.
 
 Export the trace to LangSmith and close the MCP self-debug loop (Phase 6):
 
 ```bash
 pip install -e ".[otel]"
 export LANGSMITH_API_KEY=ls-...
-chorus trace --n 12 --seed 7 --otlp --backend langsmith --project chorus
+murmur trace --n 12 --seed 7 --otlp --backend langsmith --project murmur
 ```
 
 The same `gen_ai.*` spans the local viewer renders are exported over OTLP to
 LangSmith (content capture stays off by default). The repo ships a
 [`.mcp.json`](.mcp.json) wiring the official LangSmith MCP server, so a coding agent
-can pull the run's trace back and debug Chorus from it — the "write → trace → debug"
-loop closed on Chorus itself. Full runbook:
+can pull the run's trace back and debug Murmur from it — the "write → trace → debug"
+loop closed on Murmur itself. Full runbook:
 [docs/LANGSMITH_MCP_LOOP.md](docs/LANGSMITH_MCP_LOOP.md). The exporter, CLI, and
 `.mcp.json` are in the repo and tested; the live export + MCP debugging need a
 LangSmith account (documented, never faked).
@@ -201,8 +207,8 @@ LangSmith account (documented, never faked).
 Gate CI on a *statistical* regression (Phase 5):
 
 ```bash
-chorus gate --branch main --n 20 --update-baseline                 # records the baseline
-chorus gate --branch main --n 20 --scaffold worse --success-delta -0.12   # a candidate
+murmur gate --branch main --n 20 --update-baseline                 # records the baseline
+murmur gate --branch main --n 20 --scaffold worse --success-delta -0.12   # a candidate
 ```
 
 The gate runs a task suite, compares the candidate against the stored baseline on
@@ -210,7 +216,7 @@ the same tasks/N/seed, and bootstraps a 95% CI on the per-task `pass^k` delta. I
 emits one of three verdicts and exits non-zero **only** on `regressed`:
 
 ```text
-## Chorus reliability gate — REGRESSED ❌
+## Murmur reliability gate — REGRESSED ❌
 pass^5: 0.21 -> 0.07   (Δ -0.14, 95% CI [-0.21, -0.07])   <- below 0
 New failures by class (candidate vs baseline):
   +16  contract_violation
@@ -221,23 +227,23 @@ New failures by class (candidate vs baseline):
 do not block. Blocking only on a statistically real regression — never on a raw
 dip — is what keeps the gate from crying wolf and getting disabled. The bootstrap
 is seeded, so the verdict is stable. The composite GitHub Action in
-[chorus/ci/action.yml](chorus/ci/action.yml) wraps this command, posts the report
+[murmur/ci/action.yml](murmur/ci/action.yml) wraps this command, posts the report
 as a PR comment, and sets the check status.
 
 Load the real SWE-bench Verified task set behind the same seam:
 
 ```bash
 # from a local dump of princeton-nlp/SWE-bench_Verified, or `pip install datasets`
-CHORUS_SWEBENCH_PATH=swebench_verified.jsonl \
-  chorus gate --suite swe-bench-verified --n 5
+MURMUR_SWEBENCH_PATH=swebench_verified.jsonl \
+  murmur gate --suite swe-bench-verified --n 5
 ```
 
 The loader maps each instance to a `TaskSpec` (problem statement → prompt, the
 `FAIL_TO_PASS` / `PASS_TO_PASS` tests → an acceptance contract in metadata) over a
 deterministic subset. The gate deliberately **refuses** to run these through the
 built-in stochastic scaffold — that would emit a `pass^k` that *looks* like a
-benchmark result and isn't. The old `chorus bench` patch-only path is deprecated;
-use `chorus fix-test` or `chorus run-contract` for public proof runs.
+benchmark result and isn't. The old `murmur bench` patch-only path is deprecated;
+use `murmur fix-test` or `murmur run-contract` for public proof runs.
 
 Legacy SWE-bench harness-only comparison (internal evaluator seam):
 
@@ -245,7 +251,7 @@ Legacy SWE-bench harness-only comparison (internal evaluator seam):
 # Deprecated public path; retained only for internal/legacy evaluator work.
 pip install -e '.[bench]'          # anthropic + datasets + swebench (needs Docker)
 export ANTHROPIC_API_KEY=sk-ant-…  # one model, held fixed across scaffolds
-chorus bench --subset 100 --n 10 --k 5 \
+murmur bench --subset 100 --n 10 --k 5 \
   --scaffold-a single-shot --scaffold-b self-repair
 ```
 
@@ -267,7 +273,7 @@ conductor so it inherits tracing, replay, and per-step diagnosis (per-trajectory
 Docker eval; use a small N):
 
 ```bash
-chorus gate --suite swe-bench-verified --real-agent --scaffold self-repair --n 5
+murmur gate --suite swe-bench-verified --real-agent --scaffold self-repair --n 5
 ```
 
 *(Illustrative layout — the figures above are not a measured result.)* The harness
@@ -288,5 +294,5 @@ ran**; without them it exits with an actionable error rather than a placeholder.
 This checkout is configured for:
 
 ```bash
-origin https://github.com/Zwc-11/chorus.git
+origin https://github.com/Zwc-11/murmur.git
 ```
