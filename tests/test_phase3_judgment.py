@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
-from chorus.adapters.storage.memory import InMemoryEventStore
-from chorus.core.events import EventRecorder, EventType
-from chorus.core.judge import (
+from murmur.adapters.storage.memory import InMemoryEventStore
+from murmur.core.events import EventRecorder, EventType
+from murmur.core.judge import (
     JudgeCallCache,
     JudgePolicy,
     LabelledJudgeCase,
@@ -15,14 +15,14 @@ from chorus.core.judge import (
     judge_run,
     measure_judge_cost,
 )
-from chorus.core.metrics import reliability_metrics
-from chorus.core.types import RunResult, TaskSpec, TrajectoryResult
-from chorus.gateway.tool_gateway import ToolGateway
+from murmur.core.metrics import reliability_metrics
+from murmur.core.types import RunResult, TaskSpec, TrajectoryResult
+from murmur.gateway.tool_gateway import ToolGateway
 
 TASK = TaskSpec(
     task_id="demo.echo_uppercase",
-    prompt="hello chorus",
-    expected_output="HELLO CHORUS",
+    prompt="hello murmur",
+    expected_output="HELLO MURMUR",
 )
 
 
@@ -32,8 +32,8 @@ def run_async(value):
 
 def test_cascade_resolves_converged_run_without_tier2() -> None:
     result = _run(
-        _trajectory("t1", "pass", "HELLO CHORUS"),
-        _trajectory("t2", "pass", "HELLO CHORUS"),
+        _trajectory("t1", "pass", "HELLO MURMUR"),
+        _trajectory("t2", "pass", "HELLO MURMUR"),
     )
 
     judgment = judge_run(result, TASK, policy=JudgePolicy(tier2_cost_usd=0.25))
@@ -46,7 +46,7 @@ def test_cascade_resolves_converged_run_without_tier2() -> None:
 
 def test_cascade_judges_only_unknown_and_minority() -> None:
     result = _run(
-        _trajectory("t1", "pass", "HELLO CHORUS"),
+        _trajectory("t1", "pass", "HELLO MURMUR"),
         _trajectory("t2", "fail", "wrong"),
         _trajectory("t3", "error", "tool exploded"),
     )
@@ -63,7 +63,7 @@ def test_cascade_judges_only_unknown_and_minority() -> None:
 
 def test_cost_measurement_reports_accuracy_parity() -> None:
     pass_case = LabelledJudgeCase(
-        result=_run(_trajectory("t1", "pass", "HELLO CHORUS")),
+        result=_run(_trajectory("t1", "pass", "HELLO MURMUR")),
         task=TASK,
         ground_truth="pass",
     )

@@ -7,14 +7,14 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
-from chorus.application import artifact_contracts as artifact_contracts_module
-from chorus.application.agent_map_runner import (
+from murmur.application import artifact_contracts as artifact_contracts_module
+from murmur.application.agent_map_runner import (
     AgentMapRunOptions,
     _grow_site_text,
     _live_result_from_workflow_run,
     run_agent_map_task,
 )
-from chorus.application.artifact_contracts import (
+from murmur.application.artifact_contracts import (
     RICH_SITE_MIN,
     RICH_SITE_TARGET,
     DocumentContract,
@@ -28,28 +28,28 @@ from chorus.application.artifact_contracts import (
     site_trust_score,
     validate_site_artifact,
 )
-from chorus.application.tool_summary import RunEvidenceIndex
-from chorus.application.workflow_planner import (
+from murmur.application.tool_summary import RunEvidenceIndex
+from murmur.application.workflow_planner import (
     _coding_fix_test,
     _writing_tournament,
     choose_workflow_size,
     plan_from_task,
     plan_task,
 )
-from chorus.application.workflow_runtime import (
+from murmur.application.workflow_runtime import (
     WorkflowNodeResult,
     WorkflowRunResult,
     _augment_prompt_with_context,
 )
-from chorus.benchmarks.swe.types import ModelResponse
-from chorus.domain.workflow import WorkflowNode
-from chorus.report.agent_map_html import render_agent_map_html, write_agent_map_html
-from chorus.report.agent_map_projector import (
+from murmur.benchmarks.swe.types import ModelResponse
+from murmur.domain.workflow import WorkflowNode
+from murmur.report.agent_map_html import render_agent_map_html, write_agent_map_html
+from murmur.report.agent_map_projector import (
     build_preview_demos,
     plan_agent_map_from_task,
     project_agent_map,
 )
-from chorus.ui.server import load_server_env
+from murmur.ui.server import load_server_env
 
 
 def test_writing_tournament_expands_agents_and_converges() -> None:
@@ -114,11 +114,11 @@ def test_agent_map_html_embeds_graph_and_bundle(tmp_path) -> None:
     workflow = _writing_tournament("Demo task", attempts=3)
     path = write_agent_map_html(tmp_path / "workflow.html", workflow=workflow, preview=True)
     html = path.read_text(encoding="utf-8")
-    assert "CHORUS_AGENT_MAP" in html
+    assert "MURMUR_AGENT_MAP" in html
     assert "agent-map-root" in html
     assert (tmp_path / "static" / "agent-map.js").is_file()
 
-    payload_marker = "window.CHORUS_AGENT_MAP = "
+    payload_marker = "window.MURMUR_AGENT_MAP = "
     start = html.index(payload_marker) + len(payload_marker)
     end = html.index(";", start)
     payload = json.loads(html[start:end])
@@ -227,7 +227,7 @@ def test_animation_website_plan_allocates_complete_artifact_budget() -> None:
 
 
 def test_hard_website_task_scales_fanout() -> None:
-    from chorus.core.agent_tasks import hard_website_task
+    from murmur.core.agent_tasks import hard_website_task
 
     task = hard_website_task().prompt
     size = choose_workflow_size(task=task, budget_usd=0.50)
@@ -855,7 +855,7 @@ def test_plan_task_forced_template_ignores_model() -> None:
 
 def test_agent_map_records_model_planner_provenance(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "chorus.application.agent_map_runner._build_model",
+        "murmur.application.agent_map_runner._build_model",
         lambda options: _PlannerStubModel(goal=options.task),
     )
     payload = run_agent_map_task(
@@ -947,7 +947,7 @@ class _ProgramStubModel:
 def test_agent_map_program_run_writes_program_artifact(tmp_path, monkeypatch) -> None:
     task = "Build a command-line PnL calculator in python"
     monkeypatch.setattr(
-        "chorus.application.agent_map_runner._build_model",
+        "murmur.application.agent_map_runner._build_model",
         lambda options: _ProgramStubModel(goal=options.task),
     )
     payload = run_agent_map_task(
@@ -1011,7 +1011,7 @@ def test_plan_task_captures_planning_time_and_usage() -> None:
 
 def test_agent_map_run_records_timeline_and_planning(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "chorus.application.agent_map_runner._build_model",
+        "murmur.application.agent_map_runner._build_model",
         lambda options: _ProgramStubModel(goal=options.task),
     )
     payload = run_agent_map_task(

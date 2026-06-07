@@ -1,17 +1,17 @@
 # Project metadata and tool configuration.
-# This is the file Python packaging tools read to install Chorus and its dev tools.
+# This is the file Python packaging tools read to install Murmur and its dev tools.
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "chorus-harness"
+name = "murmur-harness"
 version = "0.1.0"
 description = "Reliability and cost harness for coding agents."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "Chorus contributors" }]
+authors = [{ name = "Murmur contributors" }]
 dependencies = [
   "typer>=0.12.5",
   "pyyaml>=6.0",
@@ -50,14 +50,14 @@ agents = [
 ]
 
 [project.scripts]
-chorus = "chorus.cli:app"
+murmur = "murmur.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["chorus"]
+packages = ["murmur"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"chorus/report/static/agent-map.js" = "chorus/report/static/agent-map.js"
-"chorus/report/static/agent-map.css" = "chorus/report/static/agent-map.css"
+"murmur/report/static/agent-map.js" = "murmur/report/static/agent-map.js"
+"murmur/report/static/agent-map.css" = "murmur/report/static/agent-map.css"
 
 [tool.pytest.ini_options]
 addopts = "-s"
@@ -73,7 +73,7 @@ select = ["B", "E", "F", "I", "SIM", "UP"]
 [tool.ruff.lint.per-file-ignores]
 # Holds an embedded HTML/JS trace viewer as one string literal; its lines are a
 # web asset, not Python to be wrapped at 100 cols.
-"chorus/report/trace_html.py" = ["E501"]
-"chorus/report/fan_html.py" = ["E501"]
-"chorus/report/ui_theme.py" = ["E501"]
-"chorus/report/agent_map_html.py" = ["E501"]
+"murmur/report/trace_html.py" = ["E501"]
+"murmur/report/fan_html.py" = ["E501"]
+"murmur/report/ui_theme.py" = ["E501"]
+"murmur/report/agent_map_html.py" = ["E501"]
