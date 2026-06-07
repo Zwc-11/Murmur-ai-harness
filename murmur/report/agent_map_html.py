@@ -9,11 +9,11 @@ from pathlib import Path
 from murmur.domain.workflow import WorkflowPlan
 from murmur.report.agent_map_projector import build_preview_demos, project_agent_map
 from murmur.report.ui_theme import (
-    murmur_modal_markup,
-    murmur_ui_js,
     document_head,
     hud_shell_end,
     hud_shell_start,
+    murmur_modal_markup,
+    murmur_ui_js,
 )
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
