@@ -94,10 +94,10 @@ class Contract:
             issues.append("version must be 1")
         if not self.task.id:
             issues.append("task.id is required")
-        if self.task.type != "failing_test":
-            issues.append("only task.type='failing_test' is supported in the MVP")
-        if not self.task.command:
-            issues.append("task.command is required")
+        if self.task.type not in {"failing_test", "pr_diff", "workflow_task"}:
+            issues.append("task.type must be failing_test, pr_diff, or workflow_task")
+        if self.task.type == "failing_test" and not self.task.command:
+            issues.append("task.command is required for failing_test")
         if self.budget.max_cost_usd < 0:
             issues.append("budget.max_cost_usd must be non-negative")
         if self.budget.max_tool_calls < 1:

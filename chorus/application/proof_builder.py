@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from html import escape
 from pathlib import Path
 
+from chorus.application.artifacts import update_json_file, write_artifact_index
 from chorus.domain.proof import ProofPackage
 from chorus.domain.workflow import WorkflowPlan
 from chorus.report.ui_theme import (
@@ -13,15 +15,14 @@ from chorus.report.ui_theme import (
     document_head,
     hud_shell_start,
 )
+from chorus.report.workbench import write_workbench_html
 
 
 def write_proof_package(proof: ProofPackage, run_dir: Path) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "diff.patch").write_text(proof.diff, encoding="utf-8")
-    (run_dir / "summary.json").write_text(
-        json.dumps(proof.to_dict(), indent=2, default=str),
-        encoding="utf-8",
-    )
+    summary_path = run_dir / "summary.json"
+    summary_path.write_text(json.dumps(proof.to_dict(), indent=2, default=str), encoding="utf-8")
     if proof.attempts:
         (run_dir / "attempts.json").write_text(
             json.dumps(proof.attempts, indent=2, default=str),
@@ -32,19 +33,41 @@ def write_proof_package(proof: ProofPackage, run_dir: Path) -> None:
     workflow_href: str | None = None
     workflow_path = run_dir / "workflow.yaml"
     if workflow_path.is_file():
-        from chorus.report.murmur_workflow_html import write_murmur_workflow_html
+        from chorus.report.agent_map_html import write_agent_map_html
 
         workflow = WorkflowPlan.read(workflow_path)
-        write_murmur_workflow_html(
+        write_agent_map_html(
             run_dir / "workflow.html",
             workflow=workflow,
             embedded_task=workflow.goal,
+            run_dir=run_dir,
         )
         workflow_href = "workflow.html"
 
     (run_dir / "report.html").write_text(
         render_proof_html(proof, workflow_href=workflow_href),
         encoding="utf-8",
+    )
+    write_workbench_html(run_dir / "workbench.html", proof=proof)
+    artifact_index = write_artifact_index(run_dir)
+    indexed_proof = replace(
+        proof,
+        artifact_index=tuple(artifact_index),
+    )
+    write_workbench_html(run_dir / "workbench.html", proof=indexed_proof)
+    update_json_file(
+        summary_path,
+        {
+            "artifact_index": artifact_index,
+        },
+    )
+    update_json_file(
+        run_dir / "proof.json",
+        {
+            "artifact_index": artifact_index,
+            "trust_score": proof.trust_score.to_dict() if proof.trust_score else None,
+            "risk_flags": list(proof.risk_flags),
+        },
     )
 
 
@@ -61,6 +84,7 @@ def render_proof_markdown(proof: ProofPackage) -> str:
         f"- Risk: `{proof.contract.risk.level}`",
         "",
         "## Evidence",
+        f"- Trust score: {_trust_line(proof)}",
         f"- Failure reproduced: {_yes(v.failure_reproduced)}",
         f"- Target test passed: {_yes(v.target_test_passed)}",
         f"- Related tests passed: {_yes(v.related_tests_passed)}",
@@ -73,6 +97,7 @@ def render_proof_markdown(proof: ProofPackage) -> str:
         f"- Model calls: {proof.model_calls}",
         f"- Tool calls: {proof.tool_calls}",
         f"- Estimated cost: ${proof.cost_usd:.4f}",
+        f"- Tool call outcomes: {_tool_outcome_line(proof.tool_summary)}",
         "",
         "## Failures",
         ", ".join(v.failures) if v.failures else "none",
@@ -97,6 +122,7 @@ def render_proof_html(proof: ProofPackage, *, workflow_href: str | None = None) 
     status_color = "#146b3a" if status == "pass" else "var(--accent)"
 
     evidence_rows = [
+        ("Trust score", _trust_line(proof)),
         ("Failure reproduced", _yes(v.failure_reproduced)),
         ("Target test passed", _yes(v.target_test_passed)),
         ("Related tests passed", _yes(v.related_tests_passed)),
@@ -111,6 +137,8 @@ def render_proof_html(proof: ProofPackage, *, workflow_href: str | None = None) 
     )
 
     attempts_md = "\n".join(_attempt_lines(proof))
+    tools_md = json.dumps(proof.tool_summary or {}, indent=2, default=str)
+    artifacts_md = json.dumps(proof.artifact_index or (), indent=2, default=str)
     diff_escaped = escape(proof.diff)
     summary_escaped = escape(proof.summary or "No agent summary provided.")
     failures_escaped = escape(", ".join(v.failures) if v.failures else "none")
@@ -119,7 +147,7 @@ def render_proof_html(proof: ProofPackage, *, workflow_href: str | None = None) 
     if workflow_href:
         workflow_link = (
             f'<p class="proof-links">'
-            f'<a href="{escape(workflow_href)}">Open workflow tree</a>'
+            f'<a href="{escape(workflow_href)}">Open agent map</a>'
             f"</p>"
         )
 
@@ -170,6 +198,12 @@ document.getElementById("proof-summary-open").addEventListener("click", () => {{
 document.getElementById("proof-failures-open").addEventListener("click", () => {{
   chorusOpenModal("failures", '<p class="lead">{failures_escaped}</p>');
 }});
+document.getElementById("proof-tools-open").addEventListener("click", () => {{
+  chorusOpenModal("tool calls", '<pre class="proof-pre">{escape(tools_md)}</pre>');
+}});
+document.getElementById("proof-artifacts-open").addEventListener("click", () => {{
+  chorusOpenModal("artifacts", '<pre class="proof-pre">{escape(artifacts_md)}</pre>');
+}});
 """
 
     head = document_head(title=f"Chorus PR Proof — {proof.run_id}", extra_css=extra_css)
@@ -191,6 +225,8 @@ document.getElementById("proof-failures-open").addEventListener("click", () => {
     <div class="proof-actions">
       <button type="button" id="proof-diff-open">View diff</button>
       <button type="button" id="proof-attempts-open">View attempts</button>
+      <button type="button" id="proof-tools-open">Tool calls</button>
+      <button type="button" id="proof-artifacts-open">Artifacts</button>
       <button type="button" id="proof-summary-open">Agent summary</button>
       <button type="button" id="proof-failures-open">Failures</button>
     </div>
@@ -220,3 +256,18 @@ def _attempt_lines(proof: ProofPackage) -> list[str]:
             f"test {last_test.get('summary', 'not run')}"
         )
     return lines
+
+
+def _tool_outcome_line(summary: dict[str, object]) -> str:
+    if not summary:
+        return "none"
+    succeeded = int(summary.get("succeeded", 0))
+    failed = int(summary.get("failed", 0))
+    denied = int(summary.get("denied", 0))
+    return f"{succeeded} succeeded, {failed} failed, {denied} denied"
+
+
+def _trust_line(proof: ProofPackage) -> str:
+    if proof.trust_score is None:
+        return "not scored"
+    return f"{proof.trust_score.score}/100 ({proof.trust_score.level})"

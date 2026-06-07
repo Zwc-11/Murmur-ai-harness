@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -14,6 +15,7 @@ from chorus.adapters.tools.contract_proxy import ContractToolProxy
 from chorus.application.contract_compiler import compile_fix_test_contract
 from chorus.application.event_log import JsonlRunEventLog
 from chorus.application.proof_builder import write_proof_package
+from chorus.application.tool_summary import RunEvidenceIndex
 from chorus.application.verifier import verify_contract
 from chorus.application.workflow_runtime import (
     OperatorRegistry,
@@ -25,6 +27,7 @@ from chorus.domain.contract import Contract
 from chorus.domain.policy import BudgetState, PolicyEngine
 from chorus.domain.proof import ProofPackage
 from chorus.domain.tool import ExecResult
+from chorus.domain.trust import compute_trust_score
 from chorus.domain.verification import VerificationResult
 from chorus.domain.workflow import WorkflowNode, WorkflowPlan
 
@@ -40,6 +43,7 @@ class AttemptResult:
     model_calls: int
     tool_calls: int
     cost_usd: float
+    runtime_seconds: float
     repair_iterations: int
     run_dir: Path
 
@@ -60,6 +64,7 @@ class AttemptResult:
             "model_calls": self.model_calls,
             "tool_calls": self.tool_calls,
             "cost_usd": self.cost_usd,
+            "runtime_seconds": self.runtime_seconds,
             "repair_iterations": self.repair_iterations,
             "run_dir": str(self.run_dir),
         }
@@ -69,6 +74,7 @@ class AttemptResult:
 class FixTestWorkflowConfig:
     attempts: int
     max_repairs: int
+    attempt_concurrency: int
     agent_name: str
     provider: str
     model: str
@@ -108,6 +114,7 @@ def run_fix_test(
     model: str = "",
     attempts: int = 1,
     max_repairs: int = 0,
+    attempt_concurrency: int = 1,
 ) -> ProofPackage:
     if attempts < 1:
         raise RuntimeError("attempts must be at least 1")
@@ -134,11 +141,16 @@ def run_fix_test(
         agent_name=agent_name,
         provider=provider,
         model=model,
+        attempt_concurrency=attempt_concurrency,
     )
     workflow_issues = workflow.validate()
     if workflow_issues:
         raise RuntimeError("; ".join(workflow_issues))
     workflow_config = validate_fix_test_workflow(workflow, contract=contract)
+    workflow_config = replace(
+        workflow_config,
+        attempt_concurrency=max(1, attempt_concurrency, workflow_config.attempt_concurrency),
+    )
     workflow.write(run_dir / "workflow.yaml")
 
     runtime_state = FixTestRuntimeState(
@@ -157,6 +169,14 @@ def run_fix_test(
     runtime_result = runtime.run(workflow, run_id=run_id)
     result = _fix_test_result_from_state(runtime_state)
     budget = runtime_result.proof["budget"]
+    tool_summary = _write_fix_test_tool_summary(run_dir)
+    budget_state = _budget_state_from_payload(budget)
+    trust_score = compute_trust_score(
+        contract=contract,
+        verification=result.verification,
+        budget=budget_state,
+        tool_summary=tool_summary,
+    )
 
     proof = ProofPackage(
         run_id=run_id,
@@ -169,9 +189,101 @@ def run_fix_test(
         cost_usd=float(budget.get("cost_usd", 0.0)),
         summary=result.summary,
         attempts=tuple(attempt.to_dict() for attempt in result.attempts),
+        tool_summary=tool_summary,
+        trust_score=trust_score,
+        risk_flags=trust_score.risk_flags,
     )
     if result.winner is not None:
         _write_winner_evidence(result.winner, run_dir / "winner")
+    _update_runtime_proof(run_dir, tool_summary)
+    write_proof_package(proof, run_dir)
+    return proof
+
+
+def run_fix_test_workflow(
+    *,
+    workflow: WorkflowPlan,
+    repo_root: Path,
+    out_root: Path,
+    contract: Contract | None = None,
+    agent_name: str = "scripted",
+    provider: str = "",
+    model: str = "",
+    attempt_concurrency: int = 1,
+    run_id: str = "",
+) -> ProofPackage:
+    """Execute a planned coding_fix_test workflow through the contract harness."""
+
+    command = _workflow_test_command(workflow)
+    contract = contract or compile_fix_test_contract(
+        command=command,
+        repo_root=repo_root,
+        budget_usd=float(workflow.budget.get("max_cost_usd", 0.50)),
+    )
+    workflow_config = validate_fix_test_workflow(workflow, contract=contract)
+    workflow_config = replace(
+        workflow_config,
+        agent_name=agent_name or workflow_config.agent_name,
+        provider=provider or workflow_config.provider,
+        model=model or workflow_config.model,
+        attempt_concurrency=max(
+            1,
+            attempt_concurrency,
+            workflow_config.attempt_concurrency,
+        ),
+    )
+
+    run_id = run_id or f"run_{uuid4().hex[:12]}"
+    run_dir = out_root / run_id
+    reproduce_sandbox = LocalWorktreeSandbox.create(repo_root, run_dir / "reproduce")
+    before = reproduce_sandbox.run(command, parser="pytest")
+    failure_reproduced = not before.passed
+    contract.write(run_dir / "contract.yaml")
+    workflow.write(run_dir / "workflow.yaml")
+
+    runtime_state = FixTestRuntimeState(
+        config=workflow_config,
+        reproduce_result=before,
+        reproduce_sandbox=reproduce_sandbox,
+        failure_reproduced=failure_reproduced,
+        attempts=[],
+    )
+    runtime = WorkflowRuntime(
+        repo_root=repo_root,
+        out_root=out_root,
+        contract=contract,
+        registry=_fix_test_operator_registry(runtime_state),
+    )
+    runtime_result = runtime.run(workflow, run_id=run_id)
+    result = _fix_test_result_from_state(runtime_state)
+    budget = runtime_result.proof["budget"]
+    tool_summary = _write_fix_test_tool_summary(run_dir)
+    budget_state = _budget_state_from_payload(budget)
+    trust_score = compute_trust_score(
+        contract=contract,
+        verification=result.verification,
+        budget=budget_state,
+        tool_summary=tool_summary,
+    )
+
+    proof = ProofPackage(
+        run_id=run_id,
+        verdict="pass" if result.verification.passed else "fail",
+        contract=contract,
+        verification=result.verification,
+        diff=result.diff,
+        model_calls=int(budget.get("model_calls", 0)),
+        tool_calls=int(budget.get("tool_calls", 0)),
+        cost_usd=float(budget.get("cost_usd", 0.0)),
+        summary=result.summary,
+        attempts=tuple(attempt.to_dict() for attempt in result.attempts),
+        tool_summary=tool_summary,
+        trust_score=trust_score,
+        risk_flags=trust_score.risk_flags,
+    )
+    if result.winner is not None:
+        _write_winner_evidence(result.winner, run_dir / "winner")
+    _update_runtime_proof(run_dir, tool_summary)
     write_proof_package(proof, run_dir)
     return proof
 
@@ -201,31 +313,19 @@ def _fix_test_operator_registry(state: FixTestRuntimeState) -> OperatorRegistry:
                 output="failure not reproduced",
             )
         state.attempts.clear()
+        contract = context.contract or _require_contract()
+        attempts_by_index = _run_attempt_batch(
+            contract=contract,
+            repo_root=context.repo_root,
+            run_dir=context.run_dir,
+            config=state.config,
+            failure_reproduced=state.failure_reproduced,
+        )
         for index in range(state.config.attempts):
-            attempt = run_attempt(
-                contract=context.contract or _require_contract(),
-                attempt_id=f"attempt_{index + 1}",
-                repo_root=context.repo_root,
-                attempt_dir=context.run_dir / "attempts" / f"attempt_{index + 1}",
-                agent_name=state.config.agent_name,
-                provider=state.config.provider,
-                model=state.config.model,
-                budget=context.budget,
-                failure_reproduced=state.failure_reproduced,
-                max_repairs=state.config.max_repairs,
-                seed=index * 1000,
-                test_command=state.config.test_command,
-            )
+            attempt = attempts_by_index[index]
+            _merge_attempt_budget(context.budget, attempt)
             state.attempts.append(attempt)
-            context.events.emit(
-                "attempt_finished",
-                {
-                    "attempt_id": attempt.attempt_id,
-                    "passed": attempt.passed,
-                    "failures": attempt.verification.failures,
-                    "diff_lines": attempt.verification.diff_lines,
-                },
-            )
+            _emit_attempt_finished(context.events, attempt)
         return _runtime_node_result(
             node,
             {"attempts": [attempt.to_dict() for attempt in state.attempts]},
@@ -373,100 +473,105 @@ def _require_contract() -> Contract:
     raise RuntimeError("fix-test workflow requires a contract")
 
 
-def execute_fix_test_workflow(
+def _run_attempt_batch(
     *,
-    workflow: WorkflowPlan,
-    config: FixTestWorkflowConfig,
     contract: Contract,
     repo_root: Path,
     run_dir: Path,
-    events: JsonlRunEventLog,
-    budget: BudgetState,
+    config: FixTestWorkflowConfig,
     failure_reproduced: bool,
-    reproduce_result: ExecResult,
-    reproduce_sandbox: LocalWorktreeSandbox,
-) -> FixTestWorkflowResult:
-    nodes = _workflow_nodes(workflow)
-    _finish_node(events, nodes["reproduce"], {"result": reproduce_result.to_dict()})
+) -> dict[int, AttemptResult]:
+    concurrency = max(1, min(config.attempt_concurrency, config.attempts))
+    if concurrency == 1:
+        return {
+            index: _run_one_attempt(
+                index=index,
+                contract=contract,
+                repo_root=repo_root,
+                run_dir=run_dir,
+                config=config,
+                failure_reproduced=failure_reproduced,
+            )
+            for index in range(config.attempts)
+        }
 
-    if not failure_reproduced:
-        events.emit("verification_failed", {"failure": "failure_not_reproduced"})
-        _skip_node(events, nodes["generate"], "failure_not_reproduced")
-        _skip_node(events, nodes["run_tests"], "failure_not_reproduced")
-        _skip_node(events, nodes["repair"], "failure_not_reproduced")
-        _skip_node(events, nodes["rank"], "failure_not_reproduced")
-        _start_node(events, nodes["verify"])
-        policy = PolicyEngine(contract, budget)
-        verification = verify_contract(
-            contract=contract,
-            sandbox=reproduce_sandbox,
-            policy=policy,
-            failure_reproduced=False,
-        )
-        diff = reproduce_sandbox.git_diff()
-        _finish_node(events, nodes["verify"], {"verification": verification.to_dict()})
-        _start_node(events, nodes["report"])
-        _finish_node(events, nodes["report"], {"summary": "failure not reproduced"})
-        return FixTestWorkflowResult(
-            verification=verification,
-            diff=diff,
-            summary="failure not reproduced",
-            attempts=(),
-        )
+    results: dict[int, AttemptResult] = {}
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
+        futures = {
+            pool.submit(
+                _run_one_attempt,
+                index=index,
+                contract=contract,
+                repo_root=repo_root,
+                run_dir=run_dir,
+                config=config,
+                failure_reproduced=failure_reproduced,
+            ): index
+            for index in range(config.attempts)
+        }
+        for future in as_completed(futures):
+            index = futures[future]
+            results[index] = future.result()
+    return results
 
-    _start_node(events, nodes["generate"])
-    _start_node(events, nodes["run_tests"])
-    _start_node(events, nodes["repair"])
-    attempt_results: list[AttemptResult] = []
-    for index in range(config.attempts):
-        attempt = run_attempt(
-            contract=contract,
-            attempt_id=f"attempt_{index + 1}",
-            repo_root=repo_root,
-            attempt_dir=run_dir / "attempts" / f"attempt_{index + 1}",
-            agent_name=config.agent_name,
-            provider=config.provider,
-            model=config.model,
-            budget=budget,
-            failure_reproduced=failure_reproduced,
-            max_repairs=config.max_repairs,
-            seed=index * 1000,
-            test_command=config.test_command,
-        )
-        attempt_results.append(attempt)
-        events.emit(
-            "attempt_finished",
-            {
-                "attempt_id": attempt.attempt_id,
-                "passed": attempt.passed,
-                "failures": attempt.verification.failures,
-                "diff_lines": attempt.verification.diff_lines,
-            },
-        )
-    _finish_node(events, nodes["generate"], {"attempts": len(attempt_results)})
-    _finish_node(
-        events,
-        nodes["run_tests"],
-        {"test_results": sum(len(attempt.test_results) for attempt in attempt_results)},
+
+def _run_one_attempt(
+    *,
+    index: int,
+    contract: Contract,
+    repo_root: Path,
+    run_dir: Path,
+    config: FixTestWorkflowConfig,
+    failure_reproduced: bool,
+) -> AttemptResult:
+    attempt_contract = _contract_for_attempt(contract, config.attempts)
+    attempt_budget = BudgetState()
+    return run_attempt(
+        contract=attempt_contract,
+        attempt_id=f"attempt_{index + 1}",
+        repo_root=repo_root,
+        attempt_dir=run_dir / "attempts" / f"attempt_{index + 1}",
+        agent_name=config.agent_name,
+        provider=config.provider,
+        model=config.model,
+        budget=attempt_budget,
+        failure_reproduced=failure_reproduced,
+        max_repairs=config.max_repairs,
+        seed=index * 1000,
+        test_command=config.test_command,
     )
-    _finish_node(events, nodes["repair"], {"max_iterations": config.max_repairs})
 
-    _start_node(events, nodes["rank"])
-    winner = _select_winner(attempt_results)
-    _finish_node(events, nodes["rank"], {"winner": winner.attempt_id})
 
-    _start_node(events, nodes["verify"])
-    _finish_node(events, nodes["verify"], {"verification": winner.verification.to_dict()})
+def _contract_for_attempt(contract: Contract, attempts: int) -> Contract:
+    attempts = max(1, attempts)
+    budget = replace(
+        contract.budget,
+        max_cost_usd=contract.budget.max_cost_usd / attempts,
+        max_model_calls=max(1, contract.budget.max_model_calls // attempts),
+        max_tool_calls=max(1, contract.budget.max_tool_calls // attempts),
+    )
+    return replace(contract, budget=budget)
 
-    summary = _winner_summary(winner, attempt_results)
-    _start_node(events, nodes["report"])
-    _finish_node(events, nodes["report"], {"summary": summary})
-    return FixTestWorkflowResult(
-        verification=winner.verification,
-        diff=winner.diff,
-        summary=summary,
-        attempts=tuple(attempt_results),
-        winner=winner,
+
+def _merge_attempt_budget(budget: BudgetState, attempt: AttemptResult) -> None:
+    budget.model_calls += attempt.model_calls
+    budget.tool_calls += attempt.tool_calls
+    budget.cost_usd += attempt.cost_usd
+    budget.runtime_seconds += attempt.runtime_seconds
+
+
+def _emit_attempt_finished(events: JsonlRunEventLog, attempt: AttemptResult) -> None:
+    events.emit(
+        "attempt_finished",
+        {
+            "attempt_id": attempt.attempt_id,
+            "passed": attempt.passed,
+            "failures": attempt.verification.failures,
+            "diff_lines": attempt.verification.diff_lines,
+            "model_calls": attempt.model_calls,
+            "tool_calls": attempt.tool_calls,
+            "runtime_seconds": attempt.runtime_seconds,
+        },
     )
 
 
@@ -492,6 +597,7 @@ def run_attempt(
     model_calls_before = budget.model_calls
     tool_calls_before = budget.tool_calls
     cost_before = budget.cost_usd
+    runtime_before = budget.runtime_seconds
     summaries: list[str] = []
     test_results: list[ExecResult] = []
     feedback = ""
@@ -500,7 +606,13 @@ def run_attempt(
         phase = "generate" if iteration == 0 else "repair"
         events.emit(f"{phase}_started", {"iteration": iteration})
         policy = PolicyEngine(contract, budget)
-        proxy = ContractToolProxy(sandbox=sandbox, policy=policy, budget=budget, events=events)
+        proxy = ContractToolProxy(
+            sandbox=sandbox,
+            policy=policy,
+            budget=budget,
+            events=events,
+            metadata={"attempt_id": attempt_id, "iteration": iteration, "phase": phase},
+        )
         agent = build_contract_agent(
             agent=agent_name,
             provider=provider,
@@ -539,6 +651,7 @@ def run_attempt(
         model_calls=budget.model_calls - model_calls_before,
         tool_calls=budget.tool_calls - tool_calls_before,
         cost_usd=budget.cost_usd - cost_before,
+        runtime_seconds=budget.runtime_seconds - runtime_before,
         repair_iterations=max(0, len(test_results) - 1),
         run_dir=attempt_dir,
     )
@@ -555,10 +668,14 @@ def compile_fix_test_workflow(
     agent_name: str,
     provider: str,
     model: str,
+    attempt_concurrency: int = 1,
 ) -> WorkflowPlan:
     return WorkflowPlan(
         version=1,
+        schema_version=1,
+        name="coding_fix_test",
         goal=f"Closed-loop fix-test: {contract.task.command}",
+        description="Closed-loop coding repair from an objective test command.",
         budget={
             "max_cost_usd": contract.budget.max_cost_usd,
             "max_model_calls": contract.budget.max_model_calls,
@@ -566,6 +683,7 @@ def compile_fix_test_workflow(
             "max_runtime_seconds": contract.budget.max_runtime_seconds,
             "max_candidates": attempts,
             "max_repairs_per_candidate": max_repairs,
+            "attempt_concurrency": max(1, attempt_concurrency),
         },
         nodes=(
             WorkflowNode(
@@ -583,6 +701,7 @@ def compile_fix_test_workflow(
                     "provider": provider,
                     "model": model,
                     "isolation": "worktree_per_attempt",
+                    "attempt_concurrency": max(1, attempt_concurrency),
                 },
             ),
             WorkflowNode(
@@ -657,14 +776,18 @@ def validate_fix_test_workflow(
         raise RuntimeError("workflow run_tests command must match contract task command")
 
     attempts = int(nodes["generate"].params.get("n", 0))
+    attempt_concurrency = int(nodes["generate"].params.get("attempt_concurrency", 1))
     max_repairs = int(nodes["repair"].params.get("max_iterations", -1))
     if attempts < 1:
         raise RuntimeError("workflow generate.n must be at least 1")
+    if attempt_concurrency < 1:
+        raise RuntimeError("workflow generate.attempt_concurrency must be at least 1")
     if max_repairs < 0:
         raise RuntimeError("workflow repair.max_iterations must be non-negative")
     return FixTestWorkflowConfig(
         attempts=attempts,
         max_repairs=max_repairs,
+        attempt_concurrency=attempt_concurrency,
         agent_name=str(nodes["generate"].params.get("agent", "scripted")),
         provider=str(nodes["generate"].params.get("provider", "")),
         model=str(nodes["generate"].params.get("model", "")),
@@ -699,40 +822,60 @@ def proof_summary(proof: ProofPackage) -> str:
             "changed_files": proof.verification.changed_files,
             "failures": proof.verification.failures,
             "attempts": len(proof.attempts),
+            "trust_score": proof.trust_score.score if proof.trust_score else None,
         },
         indent=2,
     )
 
 
+def _budget_state_from_payload(payload: dict[str, Any]) -> BudgetState:
+    return BudgetState(
+        cost_usd=float(payload.get("cost_usd", 0.0)),
+        model_calls=int(payload.get("model_calls", 0)),
+        tool_calls=int(payload.get("tool_calls", 0)),
+        runtime_seconds=float(payload.get("runtime_seconds", 0.0)),
+    )
+
+
+def _workflow_test_command(workflow: WorkflowPlan) -> str:
+    nodes = _workflow_nodes(workflow)
+    for node_id in ("run_tests", "reproduce"):
+        node = nodes.get(node_id)
+        if node is not None and node.params.get("command"):
+            return str(node.params["command"])
+    for node in workflow.nodes:
+        if node.op == "exec" and node.params.get("command"):
+            return str(node.params["command"])
+    raise RuntimeError("coding_fix_test workflow does not contain a test command")
+
+
+def _write_fix_test_tool_summary(run_dir: Path) -> dict[str, Any]:
+    summary = _fix_test_evidence_index(run_dir).tool_summary()
+    (run_dir / "tool_summary.json").write_text(
+        json.dumps(summary, indent=2),
+        encoding="utf-8",
+    )
+    return summary
+
+
+def _update_runtime_proof(run_dir: Path, tool_summary: dict[str, Any]) -> None:
+    path = run_dir / "proof.json"
+    if not path.is_file():
+        return
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["tool_summary"] = tool_summary
+    payload["model_retries"] = _fix_test_evidence_index(run_dir).count("model_call_retry")
+    path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+
+
+def _fix_test_evidence_index(run_dir: Path) -> RunEvidenceIndex:
+    paths = [run_dir / "events.jsonl"]
+    paths.extend(sorted((run_dir / "attempts").glob("attempt_*/events.jsonl")))
+    return RunEvidenceIndex.from_paths(paths)
+
+
 def _workflow_nodes(workflow: WorkflowPlan) -> dict[str, WorkflowNode]:
     return {node.id: node for node in workflow.nodes}
-
-
-def _start_node(events: JsonlRunEventLog, node: WorkflowNode) -> None:
-    events.emit(
-        "workflow_node_started",
-        {"node_id": node.id, "op": node.op, "inputs": node.inputs, "params": node.params},
-    )
-
-
-def _finish_node(
-    events: JsonlRunEventLog,
-    node: WorkflowNode,
-    payload: dict[str, Any] | None = None,
-) -> None:
-    if payload is None:
-        payload = {}
-    events.emit(
-        "workflow_node_finished",
-        {"node_id": node.id, "op": node.op, **payload},
-    )
-
-
-def _skip_node(events: JsonlRunEventLog, node: WorkflowNode, reason: str) -> None:
-    events.emit(
-        "workflow_node_skipped",
-        {"node_id": node.id, "op": node.op, "reason": reason},
-    )
 
 
 def _run_policy_test(proxy: ContractToolProxy, command: str) -> ExecResult:

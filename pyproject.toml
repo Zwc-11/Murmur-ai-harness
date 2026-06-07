@@ -15,6 +15,10 @@ authors = [{ name = "Chorus contributors" }]
 dependencies = [
   "typer>=0.12.5",
   "pyyaml>=6.0",
+  # Model SDKs ship by default so the workbench can make real calls after a clone.
+  # DeepSeek uses the OpenAI-compatible client; Anthropic is the alternate provider.
+  "openai>=1.40",
+  "anthropic>=0.40",
 ]
 
 [project.optional-dependencies]
@@ -51,6 +55,10 @@ chorus = "chorus.cli:app"
 [tool.hatch.build.targets.wheel]
 packages = ["chorus"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"chorus/report/static/agent-map.js" = "chorus/report/static/agent-map.js"
+"chorus/report/static/agent-map.css" = "chorus/report/static/agent-map.css"
+
 [tool.pytest.ini_options]
 addopts = "-s"
 testpaths = ["tests"]
@@ -68,4 +76,4 @@ select = ["B", "E", "F", "I", "SIM", "UP"]
 "chorus/report/trace_html.py" = ["E501"]
 "chorus/report/fan_html.py" = ["E501"]
 "chorus/report/ui_theme.py" = ["E501"]
-"chorus/report/murmur_workflow_html.py" = ["E501"]
+"chorus/report/agent_map_html.py" = ["E501"]
