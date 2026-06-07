@@ -2,6 +2,7 @@
 # These are build outputs, caches, virtual environments, and private env files.
 .venv/
 .chorus/
+.murmur/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
@@ -12,3 +13,4 @@ dist/
 .env
 
 .venv-linux/
+chorus/ui/agent-map/node_modules/

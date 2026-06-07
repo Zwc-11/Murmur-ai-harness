@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
+from dataclasses import replace
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -13,8 +15,20 @@ from chorus.adapters.tools.contract_proxy import ContractToolProxy
 from chorus.application.contract_compiler import compile_fix_test_contract
 from chorus.application.event_log import JsonlRunEventLog
 from chorus.application.fix_test import compile_fix_test_workflow, validate_fix_test_workflow
+from chorus.application.workflow_planner import (
+    choose_workflow_size,
+    plan_from_model,
+    plan_from_task,
+)
+from chorus.application.workflow_runtime import (
+    OperatorRegistry,
+    WorkflowContext,
+    WorkflowNodeResult,
+    WorkflowRuntime,
+)
+from chorus.benchmarks.swe.types import ModelResponse
 from chorus.cli import app
-from chorus.domain.contract import Contract
+from chorus.domain.contract import Contract, ToolPolicy
 from chorus.domain.policy import BudgetState, PolicyEngine
 from chorus.domain.tool import ToolRequest
 from chorus.domain.workflow import WorkflowNode, WorkflowPlan
@@ -235,6 +249,87 @@ def test_tool_proxy_denies_forbidden_exec_command(tmp_path: Path) -> None:
     assert not result.ok
     assert "blocked" in result.error
     assert budget.tool_calls == 0
+
+
+def test_tool_proxy_denies_unregistered_allowed_tool(tmp_path: Path) -> None:
+    _write_checkout_repo(tmp_path)
+    contract = compile_fix_test_contract(
+        command="python -m pytest tests/test_checkout.py -q",
+        repo_root=tmp_path,
+    )
+    contract = replace(contract, tools=ToolPolicy(allow=("unknown_tool",), deny=()))
+    sandbox = LocalWorktreeSandbox.create(tmp_path, tmp_path / ".chorus" / "proxy")
+    budget = BudgetState()
+    policy = PolicyEngine(contract, budget)
+    events = JsonlRunEventLog(tmp_path / ".chorus" / "proxy-events.jsonl", run_id="proxy")
+    proxy = ContractToolProxy(sandbox=sandbox, policy=policy, budget=budget, events=events)
+
+    result = proxy.call("unknown_tool", {})
+
+    assert not result.ok
+    assert "not registered" in result.error
+    assert budget.tool_calls == 0
+
+
+def test_tools_list_cli_shows_registered_adapters() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["tools", "list"])
+
+    assert result.exit_code == 0, result.output
+    tools = json.loads(result.output)
+    names = {tool["name"] for tool in tools}
+    assert {"list_files", "read_file", "apply_patch", "run_test", "finish"}.issubset(names)
+    assert any(tool["writes_files"] for tool in tools if tool["name"] == "apply_patch")
+
+
+def test_tool_proxy_applies_patch_to_utf8_sig_file(tmp_path: Path) -> None:
+    _write_checkout_repo(tmp_path)
+    (tmp_path / "checkout.py").write_text(
+        "def apply_discount(price, discount):\n    return price - discount\n",
+        encoding="utf-8-sig",
+    )
+    subprocess.run(["git", "add", "."], cwd=tmp_path, capture_output=True, text=True, check=False)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=demo@example.com",
+            "-c",
+            "user.name=Demo",
+            "commit",
+            "-m",
+            "add bom",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    contract = compile_fix_test_contract(
+        command="python -m pytest tests/test_checkout.py -q",
+        repo_root=tmp_path,
+    )
+    sandbox = LocalWorktreeSandbox.create(tmp_path, tmp_path / ".chorus" / "proxy-bom")
+    budget = BudgetState()
+    policy = PolicyEngine(contract, budget)
+    events = JsonlRunEventLog(tmp_path / ".chorus" / "proxy-bom-events.jsonl", run_id="proxy")
+    proxy = ContractToolProxy(sandbox=sandbox, policy=policy, budget=budget, events=events)
+
+    content = proxy.call("read_file", {"path": "checkout.py"})
+    assert content.ok
+    patch = (
+        "--- a/checkout.py\n"
+        "+++ b/checkout.py\n"
+        "@@ -1,2 +1,2 @@\n"
+        " \ufeffdef apply_discount(price, discount):\n"
+        "-    return price - discount\n"
+        "+    return price * (1 - discount)\n"
+    )
+    result = proxy.call("apply_patch", {"patch": patch})
+
+    assert result.ok
+    assert "return price * (1 - discount)" in sandbox.read_file("checkout.py")
 
 
 def test_workflow_plan_validation_rejects_bad_nodes() -> None:
@@ -493,6 +588,271 @@ def test_workflow_run_cli_resumes_completed_node_evidence(tmp_path: Path) -> Non
     assert any(event["type"] == "workflow_node_reused" for event in events)
 
 
+def test_workflow_runtime_runs_ready_nodes_concurrently(tmp_path: Path) -> None:
+    started = 0
+    started_lock = threading.Lock()
+    both_started = threading.Event()
+
+    def wait_operator(node: WorkflowNode, _context: WorkflowContext) -> WorkflowNodeResult:
+        nonlocal started
+        with started_lock:
+            started += 1
+            if started == 2:
+                both_started.set()
+        overlapped = both_started.wait(timeout=1)
+        return WorkflowNodeResult(
+            node_id=node.id,
+            op=node.op,
+            status="completed" if overlapped else "failed",
+            passed=overlapped,
+            result={"overlapped": overlapped},
+        )
+
+    registry = OperatorRegistry()
+    registry.register("generate", wait_operator)
+    registry.register(
+        "report",
+        lambda node, _context: WorkflowNodeResult(
+            node_id=node.id,
+            op=node.op,
+            status="completed",
+            passed=True,
+            result={},
+        ),
+    )
+    workflow = WorkflowPlan(
+        version=1,
+        goal="parallel workflow",
+        budget={},
+        nodes=(
+            WorkflowNode(id="a", op="generate"),
+            WorkflowNode(id="b", op="generate"),
+            WorkflowNode(id="report", op="report", inputs=("a", "b")),
+        ),
+    )
+    runtime = WorkflowRuntime(
+        repo_root=tmp_path,
+        out_root=tmp_path / ".chorus" / "runs",
+        registry=registry,
+        concurrency=2,
+    )
+
+    result = runtime.run(workflow, run_id="parallel")
+
+    assert result.passed
+    assert started == 2
+    events = [
+        json.loads(line)
+        for line in (result.run_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    scheduled = [
+        event["payload"]["nodes"]
+        for event in events
+        if event["type"] == "workflow_nodes_scheduled"
+    ]
+    assert scheduled[0] == ["a", "b"]
+
+
+class _FakeWorkflowModel:
+    model = "fake-workflow-model"
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, int]] = []
+
+    def complete(
+        self,
+        *,
+        system: str,
+        user: str,
+        seed: int,
+        max_tokens: int = 2048,
+    ) -> ModelResponse:
+        assert max_tokens == 2048
+        self.calls.append((system, user, seed))
+        return ModelResponse(
+            text=f"artifact {len(self.calls)} seed={seed}",
+            input_tokens=10,
+            output_tokens=5,
+            cost_usd=0.01,
+        )
+
+
+def test_workflow_runtime_generate_and_map_can_use_model(tmp_path: Path) -> None:
+    model = _FakeWorkflowModel()
+    workflow = WorkflowPlan(
+        version=1,
+        goal="write artifacts",
+        budget={},
+        nodes=(
+            WorkflowNode(id="generate", op="generate", role="write one artifact", seed=3),
+            WorkflowNode(
+                id="map",
+                op="map",
+                params={"n": 2},
+                role="write one candidate",
+                seed=7,
+            ),
+            WorkflowNode(id="report", op="report", inputs=("generate", "map")),
+        ),
+    )
+    runtime = WorkflowRuntime(
+        repo_root=tmp_path,
+        out_root=tmp_path / ".chorus" / "runs",
+        model=model,
+    )
+
+    result = runtime.run(workflow, run_id="model_ops")
+
+    assert result.passed
+    assert len(model.calls) == 3
+    assert [call[2] for call in model.calls] == [3, 7, 8]
+    assert result.proof["budget"]["model_calls"] == 3
+    assert result.proof["budget"]["cost_usd"] == 0.03
+    generated = result.run_dir / "nodes" / "generate" / "artifacts" / "generated.txt"
+    assert generated.read_text(encoding="utf-8").startswith("artifact")
+    events = [
+        json.loads(line)
+        for line in (result.run_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    model_events = [event for event in events if event["type"] == "model_call_finished"]
+    assert len(model_events) == 3
+
+
+def test_map_generates_candidates_in_parallel(tmp_path: Path) -> None:
+    import time as _time
+
+    class _SlowModel:
+        model = "slow"
+
+        def complete(self, *, system, user, seed, max_tokens=2048):
+            _time.sleep(0.3)
+            return ModelResponse(text=f"cand seed={seed}", input_tokens=1, output_tokens=1)
+
+    workflow = WorkflowPlan(
+        version=1,
+        goal="x",
+        budget={},
+        nodes=(
+            WorkflowNode(id="generate", op="map", params={"n": 4, "prompt": "draft"}, seed=0),
+            WorkflowNode(id="report", op="report", inputs=("generate",)),
+        ),
+    )
+    runtime = WorkflowRuntime(
+        repo_root=tmp_path, out_root=tmp_path / ".chorus" / "runs", model=_SlowModel()
+    )
+
+    start = _time.time()
+    result = runtime.run(workflow, run_id="parallel_map")
+    elapsed = _time.time() - start
+
+    generate = next(node for node in result.node_results if node.node_id == "generate")
+    items = generate.result["items"]
+    assert items == [f"cand seed={i}" for i in range(4)]  # order preserved
+    assert elapsed < 1.0  # 4x0.3s serial = 1.2s; parallel overlaps to well under 1s
+
+
+def test_workflow_runtime_tournament_runs_deterministic_bracket(tmp_path: Path) -> None:
+    workflow = WorkflowPlan(
+        version=1,
+        goal="pick concise candidate",
+        budget={},
+        nodes=(
+            WorkflowNode(
+                id="contest",
+                op="tournament",
+                params={"candidates": ["longer candidate", "short", "medium"]},
+            ),
+        ),
+    )
+    runtime = WorkflowRuntime(repo_root=tmp_path, out_root=tmp_path / ".chorus" / "runs")
+
+    result = runtime.run(workflow, run_id="deterministic_tournament")
+
+    contest = result.node_results[0]
+    assert result.passed
+    assert contest.result["winner"] == "candidate_2"
+    assert len(contest.result["rounds"]) == 3
+    assert (
+        result.run_dir / "nodes" / "contest" / "artifacts" / "tournament.json"
+    ).is_file()
+
+
+def test_workflow_report_includes_tournament_winner_text(tmp_path: Path) -> None:
+    workflow = WorkflowPlan(
+        version=1,
+        goal="pick final draft",
+        budget={},
+        nodes=(
+            WorkflowNode(
+                id="contest",
+                op="tournament",
+                params={"candidates": ["longer draft", "short"]},
+            ),
+            WorkflowNode(id="report", op="report", inputs=("contest",)),
+        ),
+    )
+    runtime = WorkflowRuntime(repo_root=tmp_path, out_root=tmp_path / ".chorus" / "runs")
+
+    result = runtime.run(workflow, run_id="winner_report")
+
+    report = result.node_results[-1]
+    assert report.result["winner"] == {"id": "candidate_2", "text": "short"}
+    report_json = json.loads(
+        (result.run_dir / "nodes" / "report" / "artifacts" / "report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert report_json["winner"]["text"] == "short"
+
+
+class _FakeTournamentModel:
+    model = "fake-tournament-model"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def complete(
+        self,
+        *,
+        system: str,
+        user: str,
+        seed: int,
+        max_tokens: int = 1200,
+    ) -> ModelResponse:
+        del system, user, seed, max_tokens
+        self.calls += 1
+        return ModelResponse(text="B", input_tokens=4, output_tokens=1, cost_usd=0.02)
+
+
+def test_workflow_runtime_tournament_can_use_model_judge(tmp_path: Path) -> None:
+    model = _FakeTournamentModel()
+    workflow = WorkflowPlan(
+        version=1,
+        goal="pick model preferred candidate",
+        budget={},
+        nodes=(
+            WorkflowNode(
+                id="contest",
+                op="tournament",
+                params={"candidates": ["first", "second"]},
+                role="judge candidates",
+            ),
+        ),
+    )
+    runtime = WorkflowRuntime(
+        repo_root=tmp_path,
+        out_root=tmp_path / ".chorus" / "runs",
+        model=model,
+    )
+
+    result = runtime.run(workflow, run_id="model_tournament")
+
+    assert result.passed
+    assert model.calls == 1
+    assert result.node_results[0].result["winner"] == "candidate_2"
+    assert result.proof["budget"]["model_calls"] == 1
+
+
 def test_plan_cli_writes_template_workflow(tmp_path: Path) -> None:
     runner = CliRunner()
     out = tmp_path / "planned.yaml"
@@ -529,6 +889,344 @@ def test_plan_cli_writes_template_workflow(tmp_path: Path) -> None:
         "verify",
         "report",
     ]
+    assert workflow.nodes[1].op == "generate"
+
+
+def test_build_task_auto_sizes_competitive_candidates() -> None:
+    size = choose_workflow_size(task="create a animation website for Caesar", budget_usd=0.50)
+    workflow = plan_from_task(task="create a animation website for Caesar", attempts=size.attempts)
+    assert workflow.name == "site_generate_validate_repair"
+    generate = next(node for node in workflow.nodes if node.id == "generate")
+    assert generate.op == "map"
+    assert generate.params["n"] >= 4
+
+
+def test_auto_size_policy_scales_with_task_risk() -> None:
+    easy = choose_workflow_size(task="write a short note", budget_usd=0.50)
+    cover_letter = choose_workflow_size(
+        task="write a Jane Street application cover letter",
+        budget_usd=0.50,
+    )
+    coding = choose_workflow_size(
+        task="fix failing checkout regression",
+        command="python -m pytest tests/test_checkout.py -q",
+        budget_usd=0.50,
+    )
+    capped = choose_workflow_size(
+        task="complex hard security payment bug",
+        command="python -m pytest tests/test_checkout.py -q",
+        budget_usd=0.04,
+    )
+
+    assert easy.attempts == 1
+    assert easy.max_repairs == 0
+    assert cover_letter.attempts >= 4
+    assert cover_letter.max_repairs == 0
+    assert coding.attempts >= 4
+    assert coding.max_repairs >= 1
+    assert capped.attempts == 1
+
+
+def test_plan_cli_auto_sizes_cover_letter_workflow(tmp_path: Path) -> None:
+    runner = CliRunner()
+    out = tmp_path / "cover-letter.yaml"
+
+    result = runner.invoke(
+        app,
+        [
+            "plan",
+            "--task",
+            "Write a Jane Street application cover letter",
+            "--auto-size",
+            "--out",
+            str(out),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    workflow = WorkflowPlan.read(out)
+    assert workflow.name == "writing_tournament"
+    assert workflow.nodes[0].params["n"] >= 4
+    assert "Auto-size:" in result.output
+
+
+def test_planned_coding_workflow_run_uses_contract_tools(tmp_path: Path) -> None:
+    _write_checkout_repo(tmp_path)
+    runner = CliRunner()
+    workflow_path = tmp_path / "planned.yaml"
+
+    planned = runner.invoke(
+        app,
+        [
+            "plan",
+            "--task",
+            "Fix the failing checkout regression test",
+            "--cmd",
+            "python -m pytest tests/test_checkout.py -q",
+            "--auto-size",
+            "--out",
+            str(workflow_path),
+        ],
+    )
+    assert planned.exit_code == 0, planned.output
+
+    result = runner.invoke(
+        app,
+        [
+            "workflow",
+            "run",
+            str(workflow_path),
+            "--repo-root",
+            str(tmp_path),
+            "--out-dir",
+            str(tmp_path / ".chorus" / "runs"),
+            "--agent",
+            "scripted",
+            "--attempt-concurrency",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    run_dir = Path(payload["run_dir"])
+    proof = json.loads((run_dir / "proof.json").read_text(encoding="utf-8"))
+    tool_summary = json.loads((run_dir / "tool_summary.json").read_text(encoding="utf-8"))
+    assert payload["tool_calls"] > 0
+    assert proof["budget"]["tool_calls"] > 0
+    assert proof["tool_summary"]["succeeded"] > 0
+    assert tool_summary["by_attempt"]
+    assert (run_dir / "winner" / "diff.patch").is_file()
+    assert (run_dir / "report.html").is_file()
+
+
+def test_generic_writing_workflow_writes_html_and_uses_no_tools(tmp_path: Path) -> None:
+    runner = CliRunner()
+    workflow_path = tmp_path / "writing.yaml"
+
+    planned = runner.invoke(
+        app,
+        [
+            "plan",
+            "--task",
+            "Write an application cover letter",
+            "--n",
+            "2",
+            "--out",
+            str(workflow_path),
+        ],
+    )
+    assert planned.exit_code == 0, planned.output
+
+    result = runner.invoke(
+        app,
+        [
+            "workflow",
+            "run",
+            str(workflow_path),
+            "--repo-root",
+            str(tmp_path),
+            "--out-dir",
+            str(tmp_path / ".chorus" / "runs"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    run_dir = Path(payload["run_dir"])
+    proof = json.loads((run_dir / "proof.json").read_text(encoding="utf-8"))
+    assert proof["budget"]["tool_calls"] == 0
+    assert proof["tool_summary"]["total"] == 0
+    workflow_html = (run_dir / "workflow.html").read_text(encoding="utf-8")
+    assert "CHORUS_AGENT_MAP" in workflow_html
+    assert "agent-map-root" in workflow_html
+    assert (run_dir / "static" / "agent-map.js").is_file()
+
+
+def test_verify_pr_passes_for_small_safe_diff(tmp_path: Path) -> None:
+    _write_pr_repo(tmp_path)
+    _commit_file(tmp_path, "app.py", "def answer():\n    return 43\n", "change answer")
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "verify-pr",
+            "--base",
+            "HEAD~1",
+            "--head",
+            "HEAD",
+            "--repo-root",
+            str(tmp_path),
+            "--out-dir",
+            str(tmp_path / ".chorus" / "pr-runs"),
+            "--cmd",
+            "python -m pytest tests/test_app.py -q",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    run_dir = Path(payload["run_dir"])
+    proof = json.loads((run_dir / "proof.json").read_text(encoding="utf-8"))
+    assert proof["status"] == "pass"
+    assert proof["trust_score"]["score"] >= 80
+    assert "app.py" in proof["verification"]["changed_files"]
+    assert (run_dir / "review_comment.md").is_file()
+    assert (run_dir / "workbench.html").is_file()
+    inspected = runner.invoke(app, ["proof", "inspect", str(run_dir)])
+    assert inspected.exit_code == 0, inspected.output
+    assert "trust_score" in inspected.output
+
+
+def test_verify_pr_fails_for_forbidden_file(tmp_path: Path) -> None:
+    _write_pr_repo(tmp_path)
+    _commit_file(
+        tmp_path,
+        ".github/workflows/ci.yml",
+        "name: ci\n",
+        "touch workflow",
+    )
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "verify-pr",
+            "--base",
+            "HEAD~1",
+            "--head",
+            "HEAD",
+            "--repo-root",
+            str(tmp_path),
+            "--out-dir",
+            str(tmp_path / ".chorus" / "pr-runs"),
+        ],
+    )
+
+    assert result.exit_code == 1, result.output
+    payload = json.loads(result.output)
+    proof = json.loads((Path(payload["run_dir"]) / "proof.json").read_text(encoding="utf-8"))
+    assert "forbidden_file_touched" in proof["verification"]["failures"]
+    assert proof["trust_score"]["level"] in {"medium", "low"}
+
+
+def test_verify_pr_fails_for_configured_test(tmp_path: Path) -> None:
+    _write_pr_repo(tmp_path)
+    _commit_file(tmp_path, "app.py", "def answer():\n    return 41\n", "break test")
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "verify-pr",
+            "--base",
+            "HEAD~1",
+            "--head",
+            "HEAD",
+            "--repo-root",
+            str(tmp_path),
+            "--out-dir",
+            str(tmp_path / ".chorus" / "pr-runs"),
+            "--cmd",
+            "python -m pytest tests/test_app.py -q",
+        ],
+    )
+
+    assert result.exit_code == 1, result.output
+    payload = json.loads(result.output)
+    proof = json.loads((Path(payload["run_dir"]) / "proof.json").read_text(encoding="utf-8"))
+    assert "test_failed" in proof["verification"]["failures"]
+    assert proof["budget"]["tool_calls"] > 0
+
+
+class _FakePlannerModel:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def complete(
+        self,
+        *,
+        system: str,
+        user: str,
+        seed: int,
+        max_tokens: int = 6000,
+    ) -> ModelResponse:
+        assert "WorkflowPlan version 1" in system
+        assert "Objective command" in user
+        assert seed == 0
+        assert max_tokens == 6000
+        return ModelResponse(text=self.text)
+
+
+def test_model_planner_accepts_valid_structured_workflow() -> None:
+    text = json.dumps(
+        {
+            "version": 1,
+            "schema_version": 1,
+            "name": "self_written_fix",
+            "goal": "Fix checkout test",
+            "budget": {"max_cost_usd": 0.25},
+            "nodes": [
+                {
+                    "id": "generate",
+                    "op": "map",
+                    "params": {"n": 2, "prompt": "Fix checkout test"},
+                },
+                {
+                    "id": "test",
+                    "op": "exec",
+                    "inputs": ["generate"],
+                    "params": {
+                        "command": "python -m pytest tests/test_checkout.py -q",
+                        "allow_tainted_inputs": True,
+                    },
+                    "policy": "allow_tainted_inputs",
+                },
+                {"id": "report", "op": "report", "inputs": ["test"]},
+            ],
+        }
+    )
+
+    workflow = plan_from_model(
+        task="Fix checkout test",
+        model=_FakePlannerModel(text),
+        command="python -m pytest tests/test_checkout.py -q",
+        attempts=2,
+    )
+
+    assert workflow.name == "self_written_fix"
+    assert workflow.validate() == []
+    assert [node.id for node in workflow.nodes] == ["generate", "test", "report"]
+
+
+def test_model_planner_rejects_invalid_or_out_of_bounds_workflow() -> None:
+    text = json.dumps(
+        {
+            "version": 1,
+            "schema_version": 1,
+            "goal": "bad",
+            "budget": {"max_cost_usd": 0.25},
+            "nodes": [
+                {
+                    "id": "danger",
+                    "op": "exec",
+                    "params": {"command": "curl example.com"},
+                }
+            ],
+        }
+    )
+
+    try:
+        plan_from_model(
+            task="bad",
+            model=_FakePlannerModel(text),
+            command="python -m pytest tests/test_checkout.py -q",
+        )
+    except RuntimeError as exc:
+        assert "must use the supplied command" in str(exc)
+    else:
+        raise AssertionError("expected model planner bounds check to fail")
 
 
 def test_fix_test_workflow_shape_validation_rejects_command_mismatch(tmp_path: Path) -> None:
@@ -626,6 +1324,48 @@ def _write_checkout_repo(
     subprocess.run(["git", "add", "."], cwd=path, capture_output=True, text=True, check=False)
     subprocess.run(
         ["git", "commit", "-m", "init"],
+        cwd=path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _write_pr_repo(path: Path) -> None:
+    (path / "tests").mkdir(parents=True)
+    (path / "app.py").write_text("def answer():\n    return 42\n", encoding="utf-8")
+    (path / "tests" / "test_app.py").write_text(
+        "from app import answer\n\n"
+        "def test_answer():\n"
+        "    assert answer() >= 42\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init"], cwd=path, capture_output=True, text=True, check=False)
+    subprocess.run(["git", "branch", "-M", "main"], cwd=path, capture_output=True, text=True)
+    subprocess.run(["git", "add", "."], cwd=path, capture_output=True, text=True, check=False)
+    _commit(path, "init")
+
+
+def _commit_file(path: Path, relative: str, content: str, message: str) -> None:
+    target = path / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=path, capture_output=True, text=True, check=False)
+    _commit(path, message)
+
+
+def _commit(path: Path, message: str) -> None:
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=demo@example.com",
+            "-c",
+            "user.name=Demo",
+            "commit",
+            "-m",
+            message,
+        ],
         cwd=path,
         capture_output=True,
         text=True,

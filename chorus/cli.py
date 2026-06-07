@@ -21,14 +21,21 @@ from chorus.adapters.agents.fake import FakeAgent, fake_tools
 from chorus.adapters.agents.stochastic import stochastic_agent_factory, stochastic_tools
 from chorus.adapters.storage.baseline import BaselineStore
 from chorus.adapters.storage.jsonl import JsonlEventStore
+from chorus.adapters.tools.registry import default_tool_metadata
 from chorus.application.contract_compiler import compile_fix_test_contract
 from chorus.application.fix_test import (
     proof_summary,
     run_contract,
     run_fix_test,
+    run_fix_test_workflow,
     validate_fix_test_workflow,
 )
-from chorus.application.workflow_planner import TEMPLATES, plan_from_task
+from chorus.application.pr_verify import verify_pr
+from chorus.application.workflow_planner import (
+    TEMPLATES,
+    choose_workflow_size,
+    plan_task,
+)
 from chorus.application.workflow_runtime import WorkflowRuntime, explain_workflow
 from chorus.benchmarks.loader import load_suite, suite_version_for
 from chorus.benchmarks.scaffold import Scaffold, run_suite
@@ -42,10 +49,10 @@ from chorus.core.regression import baseline_set_report, regression_verdict
 from chorus.domain.contract import Contract
 from chorus.domain.workflow import WorkflowPlan
 from chorus.gateway.tool_gateway import ReplayDivergenceError
+from chorus.report.agent_map_html import write_agent_map_html
 from chorus.report.fan import render_fan
 from chorus.report.fan_html import write_fan_html
 from chorus.report.markdown import render_run_report
-from chorus.report.murmur_workflow_html import write_murmur_workflow_html
 from chorus.report.regression_md import render_regression_comment
 from chorus.report.swe_html import write_benchmark_html
 from chorus.report.trace_html import write_traces_html
@@ -55,9 +62,13 @@ app = typer.Typer(no_args_is_help=True)
 agents_app = typer.Typer(help="List and exercise registered agent modules.")
 contract_app = typer.Typer(help="Create and validate Chorus engineering contracts.")
 workflow_app = typer.Typer(help="Create and validate Murmur workflow plans.")
+tools_app = typer.Typer(help="Inspect registered Chorus tool adapters.")
+proof_app = typer.Typer(help="Inspect Chorus proof artifacts.")
 app.add_typer(agents_app, name="agents")
 app.add_typer(contract_app, name="contract")
 app.add_typer(workflow_app, name="workflow")
+app.add_typer(tools_app, name="tools")
+app.add_typer(proof_app, name="proof")
 
 
 @app.callback()
@@ -156,14 +167,14 @@ Useful commands:
 def _write_local_preview_index(root: Path) -> Path:
     """Write the small static launcher for generated local reports."""
 
-    write_murmur_workflow_html(root / "murmur.html")
+    write_agent_map_html(root / "agent-map.html", preview=True)
 
     links = [
         (
-            "murmur",
-            "Workflow tree",
-            "murmur.html",
-            "self-writing plan · agent fan-out · growing DAG visualization",
+            "agent map",
+            "Operator map",
+            "agent-map.html",
+            "draggable modules · fan-out agents · flow playback",
         ),
         (
             "phase 2-4",
@@ -291,19 +302,124 @@ def _write_local_preview_index(root: Path) -> Path:
     return out
 
 
+@app.command("agent-map-preview")
+def agent_map_preview(
+    out_dir: Annotated[
+        Path, typer.Option(help="Directory for agent-map.html and index.html.")
+    ] = Path(".chorus/preview"),
+    serve: Annotated[
+        bool, typer.Option("--serve", help="Start a local HTTP server after writing.")
+    ] = False,
+    port: Annotated[int, typer.Option(help="Port for --serve.")] = 8765,
+) -> None:
+    """Write the agent operator map demo and refresh the local preview index."""
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stale = out_dir / "murmur.html"
+    if stale.is_file():
+        stale.unlink()
+    html_out = write_agent_map_html(out_dir / "agent-map.html", preview=True)
+    index_out = _write_local_preview_index(out_dir)
+    typer.echo(f"Agent map written to {html_out}")
+    typer.echo(f"Preview index written to {index_out}")
+    if serve:
+        preview_serve(dir=out_dir, port=port)
+
+
+@app.command("preview-serve")
+def preview_serve(
+    dir: Annotated[
+        Path, typer.Option("--dir", help="Directory to serve.")
+    ] = Path(".chorus/preview"),
+    port: Annotated[int, typer.Option(help="HTTP port.")] = 8765,
+) -> None:
+    """Serve the local Chorus preview HUD (agent map, fan, trace)."""
+
+    from chorus.ui.server import serve_preview_dir
+
+    if not dir.is_dir():
+        typer.echo(f"error: {dir} does not exist; run `chorus agent-map-preview` first", err=True)
+        raise typer.Exit(2)
+
+    try:
+        serve_preview_dir(directory=dir, repo_root=Path("."), port=port)
+    except KeyboardInterrupt:
+        typer.echo("\nStopped.")
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 10048 or exc.errno in {48, 98}:
+            typer.echo(
+                f"error: port {port} is already in use "
+                "(another preview server may still be running).",
+                err=True,
+            )
+            typer.echo(
+                f"Open http://127.0.0.1:{port}/agent-map.html in your browser, "
+                "or stop the other process and retry.",
+                err=True,
+            )
+            typer.echo(f"Or pick another port: chorus preview-serve --port {port + 1}", err=True)
+            raise typer.Exit(1) from exc
+        raise
+
+
 @app.command("murmur-preview")
 def murmur_preview(
     out_dir: Annotated[
-        Path, typer.Option(help="Directory for murmur.html and index.html.")
+        Path, typer.Option(help="Deprecated alias for agent-map-preview.")
     ] = Path(".chorus/preview"),
 ) -> None:
-    """Write the Murmur workflow tree demo and refresh the local preview index."""
+    """Deprecated: use `chorus agent-map-preview`."""
+
+    typer.echo("murmur-preview is deprecated; use agent-map-preview", err=True)
+    agent_map_preview(out_dir=out_dir)
+
+
+@app.command("murmur-web")
+def murmur_web(
+    out_dir: Annotated[
+        Path, typer.Option(help="Directory for the local Murmur web workbench.")
+    ] = Path(".chorus/preview"),
+    port: Annotated[int, typer.Option(help="HTTP port.")] = 8765,
+) -> None:
+    """Write and serve the local prompt-to-agent-result workbench."""
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    html_out = write_murmur_workflow_html(out_dir / "murmur.html")
-    index_out = _write_local_preview_index(out_dir)
-    typer.echo(f"Murmur workflow UI written to {html_out}")
-    typer.echo(f"Preview index written to {index_out}")
+    write_agent_map_html(out_dir / "agent-map.html", preview=True)
+    _write_local_preview_index(out_dir)
+    preview_serve(dir=out_dir, port=port)
+
+
+@app.command("serve")
+def serve(
+    out_dir: Annotated[
+        Path, typer.Option(help="Workbench directory.")
+    ] = Path(".chorus/preview"),
+    port: Annotated[int, typer.Option(help="HTTP port.")] = 8765,
+) -> None:
+    """Build and serve the local workbench in one command (the easiest way to start)."""
+
+    _ensure_env_ready()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    write_agent_map_html(out_dir / "agent-map.html", preview=True)
+    _write_local_preview_index(out_dir)
+    typer.echo(f"Workbench ready: http://127.0.0.1:{port}/agent-map.html")
+    preview_serve(dir=out_dir, port=port)
+
+
+def _ensure_env_ready() -> None:
+    """Create .env from the example if missing and warn when no API key is set."""
+
+    env = Path(".env")
+    example = Path(".env.example")
+    if not env.is_file() and example.is_file():
+        env.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
+        typer.echo("Created .env from .env.example - add DEEPSEEK_API_KEY to enable 'Use model'.")
+    load_project_env(start=Path("."))
+    if not (os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")):
+        typer.echo(
+            "No API key found. The workbench runs offline (leave 'Use model' unchecked); "
+            "set DEEPSEEK_API_KEY in .env for live model runs.",
+        )
 
 
 @app.command("fix-test")
@@ -323,6 +439,9 @@ def fix_test(
     max_repairs: Annotated[
         int, typer.Option(min=0, help="Maximum repair iterations per failed attempt.")
     ] = 0,
+    attempt_concurrency: Annotated[
+        int, typer.Option(min=1, help="Maximum isolated attempts to run at once.")
+    ] = 1,
 ) -> None:
     """Run the contract-first failing-test repair workflow."""
 
@@ -337,6 +456,7 @@ def fix_test(
             model=model,
             attempts=n,
             max_repairs=max_repairs,
+            attempt_concurrency=attempt_concurrency,
         )
     except (KeyError, RuntimeError) as exc:
         typer.echo(str(exc), err=True)
@@ -383,6 +503,89 @@ def contract_check(path: Annotated[Path, typer.Argument(help="Contract YAML path
             typer.echo(f"error: {issue}", err=True)
         raise typer.Exit(1)
     typer.echo(f"Contract OK: {path}")
+
+
+@app.command("verify-pr")
+def verify_pr_command(
+    base: Annotated[str, typer.Option("--base", help="Base ref for the PR diff.")] = "main",
+    head: Annotated[str, typer.Option("--head", help="Head ref for the PR diff.")] = "HEAD",
+    repo_root: Annotated[Path, typer.Option(help="Repository root.")] = Path("."),
+    out_dir: Annotated[Path, typer.Option(help="Root directory for PR proof runs.")] = Path(
+        ".chorus/pr-runs"
+    ),
+    cmd: Annotated[
+        list[str] | None,
+        typer.Option("--cmd", help="Optional objective command to run on the head ref."),
+    ] = None,
+    budget: Annotated[float, typer.Option(help="Maximum verification budget in USD.")] = 0.10,
+    run_id: Annotated[str, typer.Option(help="Optional stable run id.")] = "",
+) -> None:
+    """Verify a PR-style diff and emit a trust proof."""
+
+    try:
+        proof = verify_pr(
+            repo_root=repo_root,
+            base=base,
+            head=head,
+            out_root=out_dir,
+            commands=tuple(cmd or ()),
+            budget_usd=budget,
+            run_id=run_id,
+        )
+    except RuntimeError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    run_path = out_dir / proof.run_id
+    typer.echo(
+        json.dumps(
+            {
+                "run_id": proof.run_id,
+                "status": proof.verdict,
+                "run_dir": str(run_path),
+                "trust_score": proof.trust_score.score if proof.trust_score else None,
+                "changed_files": proof.verification.changed_files,
+                "failures": proof.verification.failures,
+            },
+            indent=2,
+        )
+    )
+    raise typer.Exit(0 if proof.verdict == "pass" else 1)
+
+
+@tools_app.command("list")
+def tools_list() -> None:
+    """List registered built-in tool adapters."""
+
+    typer.echo(json.dumps(default_tool_metadata(), indent=2))
+
+
+@proof_app.command("inspect")
+def proof_inspect(
+    run_dir: Annotated[Path, typer.Argument(help="Run directory to inspect.")],
+) -> None:
+    """Print the high-signal proof summary for one run directory."""
+
+    proof_path = run_dir / "proof.json"
+    if not proof_path.is_file():
+        proof_path = run_dir / "summary.json"
+    if not proof_path.is_file():
+        typer.echo(f"error: no proof.json or summary.json in {run_dir}", err=True)
+        raise typer.Exit(2)
+    proof = json.loads(proof_path.read_text(encoding="utf-8"))
+    verification = dict(proof.get("verification", {}))
+    budget = dict(proof.get("budget", {}))
+    trust = proof.get("trust_score") or {}
+    payload = {
+        "run_id": proof.get("run_id"),
+        "verdict": proof.get("verdict", proof.get("status")),
+        "trust_score": trust,
+        "changed_files": verification.get("changed_files", ()),
+        "failures": verification.get("failures", ()),
+        "tool_calls": proof.get("tool_calls", budget.get("tool_calls", 0)),
+        "model_calls": proof.get("model_calls", budget.get("model_calls", 0)),
+        "artifacts": proof.get("artifact_index", ()),
+    }
+    typer.echo(json.dumps(payload, indent=2, default=str))
 
 
 @workflow_app.command("check")
@@ -439,6 +642,18 @@ def workflow_run(
     ] = None,
     resume: Annotated[bool, typer.Option(help="Reuse matching completed node evidence.")] = False,
     concurrency: Annotated[int, typer.Option(min=1, help="Maximum ready nodes to schedule.")] = 1,
+    agent: Annotated[
+        str, typer.Option(help="Contract agent for coding_fix_test: scripted | chorus-lite.")
+    ] = "scripted",
+    attempt_concurrency: Annotated[
+        int,
+        typer.Option(min=1, help="Maximum isolated coding attempts to run at once."),
+    ] = 1,
+    provider: Annotated[
+        str,
+        typer.Option(help="Provider for model-backed generate/map nodes."),
+    ] = "",
+    model: Annotated[str, typer.Option(help="Model id for model-backed generate/map nodes.")] = "",
     run_id: Annotated[
         str,
         typer.Option(help="Optional stable run id for deterministic resume."),
@@ -459,10 +674,50 @@ def workflow_run(
             for issue in contract_issues:
                 typer.echo(f"error: {issue}", err=True)
             raise typer.Exit(1)
+    if _is_coding_fix_test_workflow(workflow):
+        try:
+            proof = run_fix_test_workflow(
+                workflow=workflow,
+                repo_root=repo_root,
+                out_root=out_dir,
+                contract=contract,
+                agent_name=agent,
+                provider=provider,
+                model=model,
+                attempt_concurrency=attempt_concurrency,
+                run_id=run_id,
+            )
+        except (KeyError, RuntimeError) as exc:
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(2) from exc
+        run_path = out_dir / proof.run_id
+        typer.echo(
+            json.dumps(
+                {
+                    "run_id": proof.run_id,
+                    "status": proof.verdict,
+                    "run_dir": str(run_path),
+                    "attempts": len(proof.attempts),
+                    "tool_calls": proof.tool_calls,
+                    "model_calls": proof.model_calls,
+                },
+                indent=2,
+            )
+        )
+        raise typer.Exit(0 if proof.verdict == "pass" else 1)
+    workflow_model = None
+    if provider or model:
+        from chorus.benchmarks.swe.providers import create_patch_model, default_model
+
+        workflow_model = create_patch_model(
+            provider=provider or None,
+            model=model or default_model(provider),
+        )
     runtime = WorkflowRuntime(
         repo_root=repo_root,
         out_root=out_dir,
         contract=contract,
+        model=workflow_model,
         concurrency=concurrency,
         resume=resume,
     )
@@ -501,17 +756,57 @@ def plan_workflow(
     ] = "",
     n: Annotated[int, typer.Option(min=1, help="Number of candidates for coding templates.")] = 1,
     max_repairs: Annotated[int, typer.Option(min=0, help="Repair loop budget.")] = 0,
+    auto_size: Annotated[
+        bool,
+        typer.Option(
+            "--auto-size",
+            help="Choose candidate count and repair budget from task difficulty.",
+        ),
+    ] = False,
+    budget: Annotated[float, typer.Option(help="Budget used by --auto-size.")] = 0.50,
+    self_write: Annotated[
+        bool,
+        typer.Option(
+            "--self-write",
+            help="Ask the configured model to write the workflow IR, then validate it.",
+        ),
+    ] = False,
+    provider: Annotated[str, typer.Option(help="Provider for --self-write.")] = "",
+    model: Annotated[str, typer.Option(help="Model id for --self-write.")] = "",
 ) -> None:
-    """Create a validated Murmur workflow from an approved template."""
+    """Create a validated Murmur workflow plan."""
 
     try:
-        workflow = plan_from_task(
+        size_reason = ""
+        if auto_size:
+            size = choose_workflow_size(task=task, command=cmd, budget_usd=budget)
+            n = size.attempts
+            max_repairs = size.max_repairs
+            size_reason = size.reason
+        # --self-write requests model-authored planning (the same engine the workbench
+        # uses by default); plan_task validates the model's plan and falls back to a
+        # deterministic template if the model is unavailable or its plan is invalid.
+        # The scripted CLI stays deterministic by default to avoid surprise API calls.
+        planner_model = None
+        effective_template = template
+        if self_write:
+            from chorus.benchmarks.swe.providers import create_patch_model, default_model
+
+            planner_model = create_patch_model(
+                provider=provider or None,
+                model=model or default_model(provider),
+            )
+            effective_template = "auto"
+        outcome = plan_task(
             task=task,
-            template=template,
+            model=planner_model,
             command=cmd,
+            budget_usd=budget,
+            template=effective_template,
             attempts=n,
             max_repairs=max_repairs,
         )
+        workflow = outcome.workflow
     except RuntimeError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(2) from exc
@@ -522,7 +817,28 @@ def plan_workflow(
         raise typer.Exit(1)
     workflow.write(out)
     typer.echo(f"Workflow written to {out}")
+    planner_line = f"Planner: {outcome.mode}"
+    if outcome.reason:
+        planner_line += f" ({outcome.reason})"
+    typer.echo(planner_line)
     typer.echo(f"Template: {workflow.name}")
+    if auto_size:
+        typer.echo(f"Auto-size: n={n}, max_repairs={max_repairs} ({size_reason})")
+
+
+def _is_coding_fix_test_workflow(workflow: WorkflowPlan) -> bool:
+    if workflow.name == "coding_fix_test":
+        return True
+    node_ops = {node.id: node.op for node in workflow.nodes}
+    return node_ops == {
+        "reproduce": "exec",
+        "generate": "generate",
+        "run_tests": "exec",
+        "repair": "loop",
+        "rank": "rank",
+        "verify": "verify",
+        "report": "report",
+    }
 
 
 @app.command("run-contract")
