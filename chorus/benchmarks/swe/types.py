@@ -37,6 +37,7 @@ class ModelResponse:
     input_tokens: int = 0
     output_tokens: int = 0
     cost_usd: float = 0.0
+    reasoning: str = ""  # the model's hidden thinking, when the provider exposes it
 
 
 @dataclass(frozen=True, slots=True)

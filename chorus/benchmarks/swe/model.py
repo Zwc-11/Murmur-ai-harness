@@ -22,6 +22,13 @@ from chorus.benchmarks.swe.types import BenchDependencyMissing, BenchModelOutput
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
 DEFAULT_MODEL = DEFAULT_ANTHROPIC_MODEL  # backward-compatible alias
 
+# DeepSeek v4 / reasoner spend the token budget on hidden thinking before emitting
+# output. Guarantee enough room for a real answer, and auto-escalate the budget if a
+# call comes back reasoning-starved (empty content but reasoning was produced).
+REASONING_MIN_OUTPUT_TOKENS = int(os.environ.get("DEEPSEEK_MIN_OUTPUT_TOKENS", "2048"))
+REASONING_ESCALATION_CAP = int(os.environ.get("DEEPSEEK_MAX_ESCALATION_TOKENS", "16384"))
+REASONING_ESCALATION_RETRIES = 2
+
 
 @dataclass(frozen=True, slots=True)
 class Price:
@@ -215,15 +222,37 @@ class DeepSeekPatchModel:
     ) -> ModelResponse:
         del seed
         client = self._ensure_client()
-        resp = client.chat.completions.create(
-            **self._completion_kwargs(system=system, user=user, max_tokens=max_tokens)
-        )
-        choice = resp.choices[0]
-        message = choice.message
-        text = message.content or ""
-        usage = resp.usage
-        in_tok = int(getattr(usage, "prompt_tokens", 0) or 0)
-        out_tok = int(getattr(usage, "completion_tokens", 0) or 0)
+        requested = max_tokens or self.max_tokens
+        budget = requested
+        if self._uses_advanced_reasoning():
+            budget = max(requested, REASONING_MIN_OUTPUT_TOKENS)
+
+        choice: Any = None
+        text = ""
+        in_tok = out_tok = 0
+        for attempt in range(REASONING_ESCALATION_RETRIES + 1):
+            resp = client.chat.completions.create(
+                **self._completion_kwargs(system=system, user=user, max_tokens=budget)
+            )
+            choice = resp.choices[0]
+            text = choice.message.content or ""
+            usage = resp.usage
+            in_tok = int(getattr(usage, "prompt_tokens", 0) or 0)
+            out_tok = int(getattr(usage, "completion_tokens", 0) or 0)
+            if text.strip() or not self._is_reasoning_starved(choice=choice, text=text):
+                return ModelResponse(
+                    text=text,
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    cost_usd=self._cost(in_tok, out_tok),
+                    reasoning=self._reasoning_text(choice),
+                )
+            if attempt < REASONING_ESCALATION_RETRIES and budget < REASONING_ESCALATION_CAP:
+                budget = min(budget * 2, REASONING_ESCALATION_CAP)
+                continue
+            break
+
+        # Exhausted escalation while still reasoning-starved: surface the hard error.
         self._raise_if_reasoning_starved(choice=choice, text=text, output_tokens=out_tok)
         return ModelResponse(
             text=text,
@@ -232,20 +261,28 @@ class DeepSeekPatchModel:
             cost_usd=self._cost(in_tok, out_tok),
         )
 
-    def _raise_if_reasoning_starved(self, *, choice: Any, text: str, output_tokens: int) -> None:
-        if text.strip():
-            return
+    def _is_reasoning_starved(self, *, choice: Any, text: str) -> bool:
+        """True when the model returned reasoning tokens but no final content."""
+
+        return not text.strip() and bool(self._reasoning_text(choice))
+
+    def _reasoning_text(self, choice: Any) -> str:
+        """The model's exposed hidden reasoning ("thinking"), or empty string."""
+
         message = choice.message
         extra = getattr(message, "model_extra", None) or {}
         reasoning = getattr(message, "reasoning_content", None) or extra.get("reasoning_content")
-        if not reasoning:
+        return str(reasoning or "")
+
+    def _raise_if_reasoning_starved(self, *, choice: Any, text: str, output_tokens: int) -> None:
+        if not self._is_reasoning_starved(choice=choice, text=text):
             return
         finish_reason = getattr(choice, "finish_reason", "")
         raise BenchModelOutputError(
-            "DeepSeek returned reasoning tokens but no final patch content "
-            f"(finish_reason={finish_reason!r}, output_tokens={output_tokens}). "
-            "For SWE-bench, use `--model deepseek-chat` or increase DEEPSEEK_MAX_TOKENS "
-            "substantially; otherwise Chorus would submit an empty patch."
+            "DeepSeek returned reasoning tokens but no final content after escalating the "
+            f"token budget (finish_reason={finish_reason!r}, output_tokens={output_tokens}). "
+            "Increase DEEPSEEK_MIN_OUTPUT_TOKENS / DEEPSEEK_MAX_ESCALATION_TOKENS, or use "
+            "`--model deepseek-chat`."
         )
 
     def _cost(self, input_tokens: int, output_tokens: int) -> float:

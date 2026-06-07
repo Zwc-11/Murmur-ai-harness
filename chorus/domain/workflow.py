@@ -97,6 +97,7 @@ class WorkflowPlan:
     description: str = ""
     budgets: dict[str, Any] = field(default_factory=dict)
     artifacts: tuple[str, ...] = ()
+    artifact_kind: str = ""  # "site" | "program" | "document" — the declared deliverable
 
     def validate(self) -> list[str]:
         issues: list[str] = []
@@ -135,6 +136,7 @@ class WorkflowPlan:
             "budget": self.budget,
             "budgets": self.budgets,
             "artifacts": list(self.artifacts),
+            "artifact_kind": self.artifact_kind,
             "nodes": [node.to_dict() for node in self.nodes],
         }
         return {key: value for key, value in data.items() if value not in ("", (), {}, [])}
@@ -152,6 +154,7 @@ class WorkflowPlan:
             description=str(data.get("description", "")),
             budgets=dict(data.get("budgets", {})),
             artifacts=tuple(str(item) for item in data.get("artifacts", ())),
+            artifact_kind=str(data.get("artifact_kind", "")),
         )
 
     def to_yaml(self) -> str:

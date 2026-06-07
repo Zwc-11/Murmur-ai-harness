@@ -14,6 +14,30 @@ The architecture is Python-first. The core is hexagonal: the domain owns
 contracts, events, replay, metrics, and run orchestration; models, agents,
 storage, tracing, judges, and reports plug in through ports.
 
+## Quickstart: the workbench
+
+Run the prompt-to-artifact workbench locally in a few minutes.
+
+```bash
+git clone <your-fork-url> chorus && cd chorus
+python3 -m venv .venv && . .venv/bin/activate        # Windows: .venv\Scripts\activate
+python -m pip install -e ".[dev]"                    # model SDKs ship by default
+cp .env.example .env                                 # then add DEEPSEEK_API_KEY
+chorus serve                                          # builds + serves the workbench
+```
+
+`chorus serve` prints a URL (default <http://127.0.0.1:8765/agent-map.html>). Open it,
+type a natural-language goal (a website, a program, an essay, or a fix-test), tick
+**Use model**, and click **Run agents**. The result panel shows the validated artifact
+(website preview, program, or document), the trust score, and every gate.
+
+Without an API key the workbench still runs in deterministic offline mode (leave
+**Use model** unchecked). With `deepseek-v4-pro`, planning is model-authored and the
+model designs the workflow from your task. Reasoning/thinking is on by default;
+`DEEPSEEK_MIN_OUTPUT_TOKENS` and `DEEPSEEK_MAX_ESCALATION_TOKENS` tune the safety
+budget that prevents reasoning-starvation, and `DEEPSEEK_THINKING=disabled` turns
+thinking off.
+
 ## Current slice
 
 This repo now includes the contract-first MVP plus the earlier reliability,

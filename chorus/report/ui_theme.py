@@ -82,7 +82,7 @@ def chorus_root_css() -> str:
   --digit-distance: 8px;
   --digit-stagger: 70ms;
   --digit-blur: 2px;
-  --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --digit-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --digit-dir-x: 0;
   --digit-dir-y: 1;
   --badge-slide-dur: 260ms;
@@ -94,7 +94,7 @@ def chorus_root_css() -> str:
   --badge-offset-x: -8.2px;
   --badge-offset-y: 12.4px;
   --badge-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --badge-pop-ease: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --badge-pop-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --badge-close-ease: cubic-bezier(0.4, 0, 0.2, 1);
   --text-swap-dur: 150ms;
   --text-swap-translate-y: 4px;
@@ -139,14 +139,14 @@ def chorus_root_css() -> str:
   --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --check-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
   --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
-  --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
+  --check-ease-bob: cubic-bezier(0.16, 1, 0.3, 1);
   --check-ease-path: cubic-bezier(0.22, 1, 0.36, 1);
   --avatar-lift: -4px;
   --avatar-dur: 320ms;
   --avatar-scale: 1.05;
   --avatar-falloff: 0.45;
   --avatar-ease-in: cubic-bezier(0.22, 1, 0.36, 1);
-  --avatar-ease-out: cubic-bezier(0.34, 3.85, 0.64, 1);
+  --avatar-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --shake-distance: 6px;
   --shake-overshoot: 4px;
   --shake-dur-a: 80ms;

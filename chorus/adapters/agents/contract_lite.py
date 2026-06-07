@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from difflib import unified_diff
+from time import sleep
 from typing import Any, Protocol
 
 from chorus.adapters.tools.contract_proxy import ContractToolProxy
@@ -66,10 +67,12 @@ class ChorusLiteAgent:
     def run(self, *, contract: Contract, tools: ContractToolProxy, feedback: str = "") -> str:
         transcript = _initial_observation(contract, feedback=feedback)
         for step in range(self.max_steps):
-            response = self.model.complete(
+            response = _complete_with_retries(
+                model=self.model,
                 system=_SYSTEM,
                 user=transcript,
                 seed=self.seed_offset + step,
+                tools=tools,
             )
             tools.events.emit(
                 "model_call_finished",
@@ -81,6 +84,9 @@ class ChorusLiteAgent:
             )
             tools.budget.model_calls += 1
             tools.budget.cost_usd += response.cost_usd
+            if not response.text.strip():
+                tools.events.emit("model_empty_response", {"step": step})
+                return "model returned empty content"
             action = _parse_action(response.text)
             if action is None:
                 tools.events.emit("model_invalid_action", {"text": response.text[:1000]})
@@ -126,6 +132,28 @@ def build_contract_agent(
     if agent in {"chorus-lite", "lite"}:
         return ChorusLiteAgent(provider=provider, model_id=model, seed_offset=seed)
     raise KeyError("unknown contract agent; use 'scripted' or 'chorus-lite'")
+
+
+def _complete_with_retries(
+    *,
+    model: PatchModel,
+    system: str,
+    user: str,
+    seed: int,
+    tools: ContractToolProxy,
+) -> Any:
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            return model.complete(system=system, user=user, seed=seed)
+        except Exception as exc:  # noqa: BLE001 - provider faults are run evidence
+            last_error = exc
+            tools.events.emit(
+                "model_call_retry",
+                {"attempt": attempt + 1, "error": str(exc), "metadata": tools.metadata},
+            )
+            sleep(0.25 * (attempt + 1))
+    raise RuntimeError(f"model call failed after retries: {last_error}")
 
 
 def _scripted_patch_text(text: str) -> str:
