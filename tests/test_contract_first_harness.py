@@ -10,28 +10,28 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from chorus.adapters.sandboxes.local_worktree import LocalWorktreeSandbox
-from chorus.adapters.tools.contract_proxy import ContractToolProxy
-from chorus.application.contract_compiler import compile_fix_test_contract
-from chorus.application.event_log import JsonlRunEventLog
-from chorus.application.fix_test import compile_fix_test_workflow, validate_fix_test_workflow
-from chorus.application.workflow_planner import (
+from murmur.adapters.sandboxes.local_worktree import LocalWorktreeSandbox
+from murmur.adapters.tools.contract_proxy import ContractToolProxy
+from murmur.application.contract_compiler import compile_fix_test_contract
+from murmur.application.event_log import JsonlRunEventLog
+from murmur.application.fix_test import compile_fix_test_workflow, validate_fix_test_workflow
+from murmur.application.workflow_planner import (
     choose_workflow_size,
     plan_from_model,
     plan_from_task,
 )
-from chorus.application.workflow_runtime import (
+from murmur.application.workflow_runtime import (
     OperatorRegistry,
     WorkflowContext,
     WorkflowNodeResult,
     WorkflowRuntime,
 )
-from chorus.benchmarks.swe.types import ModelResponse
-from chorus.cli import app
-from chorus.domain.contract import Contract, ToolPolicy
-from chorus.domain.policy import BudgetState, PolicyEngine
-from chorus.domain.tool import ToolRequest
-from chorus.domain.workflow import WorkflowNode, WorkflowPlan
+from murmur.benchmarks.swe.types import ModelResponse
+from murmur.cli import app
+from murmur.domain.contract import Contract, ToolPolicy
+from murmur.domain.policy import BudgetState, PolicyEngine
+from murmur.domain.tool import ToolRequest
+from murmur.domain.workflow import WorkflowNode, WorkflowPlan
 
 
 def test_contract_yaml_roundtrip_and_validation(tmp_path: Path) -> None:
@@ -109,7 +109,7 @@ def test_fix_test_scripted_agent_writes_pr_proof(tmp_path: Path) -> None:
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
             "--agent",
             "scripted",
             "--budget",
@@ -118,7 +118,7 @@ def test_fix_test_scripted_agent_writes_pr_proof(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    run_dirs = list((tmp_path / ".chorus" / "runs").glob("run_*"))
+    run_dirs = list((tmp_path / ".murmur" / "runs").glob("run_*"))
     assert len(run_dirs) == 1
     run_dir = run_dirs[0]
     assert (run_dir / "contract.yaml").is_file()
@@ -184,7 +184,7 @@ def test_fix_test_runs_multiple_isolated_attempts(tmp_path: Path) -> None:
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
             "--agent",
             "scripted",
             "--n",
@@ -193,7 +193,7 @@ def test_fix_test_runs_multiple_isolated_attempts(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    run_dir = next((tmp_path / ".chorus" / "runs").glob("run_*"))
+    run_dir = next((tmp_path / ".murmur" / "runs").glob("run_*"))
     attempts = sorted((run_dir / "attempts").glob("attempt_*"))
     assert len(attempts) == 3
     assert (run_dir / "attempts.json").is_file()
@@ -216,14 +216,14 @@ def test_failed_attempt_keeps_exec_output_in_evidence(tmp_path: Path) -> None:
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
             "--agent",
             "scripted",
         ],
     )
 
     assert result.exit_code == 1
-    run_dir = next((tmp_path / ".chorus" / "runs").glob("run_*"))
+    run_dir = next((tmp_path / ".murmur" / "runs").glob("run_*"))
     attempt = json.loads(
         (run_dir / "attempts" / "attempt_1" / "summary.json").read_text(encoding="utf-8")
     )
@@ -238,10 +238,10 @@ def test_tool_proxy_denies_forbidden_exec_command(tmp_path: Path) -> None:
         command="python -m pytest tests/test_checkout.py -q",
         repo_root=tmp_path,
     )
-    sandbox = LocalWorktreeSandbox.create(tmp_path, tmp_path / ".chorus" / "proxy")
+    sandbox = LocalWorktreeSandbox.create(tmp_path, tmp_path / ".murmur" / "proxy")
     budget = BudgetState()
     policy = PolicyEngine(contract, budget)
-    events = JsonlRunEventLog(tmp_path / ".chorus" / "proxy-events.jsonl", run_id="proxy")
+    events = JsonlRunEventLog(tmp_path / ".murmur" / "proxy-events.jsonl", run_id="proxy")
     proxy = ContractToolProxy(sandbox=sandbox, policy=policy, budget=budget, events=events)
 
     result = proxy.call("run_test", {"command": "curl example.com"})
@@ -258,10 +258,10 @@ def test_tool_proxy_denies_unregistered_allowed_tool(tmp_path: Path) -> None:
         repo_root=tmp_path,
     )
     contract = replace(contract, tools=ToolPolicy(allow=("unknown_tool",), deny=()))
-    sandbox = LocalWorktreeSandbox.create(tmp_path, tmp_path / ".chorus" / "proxy")
+    sandbox = LocalWorktreeSandbox.create(tmp_path, tmp_path / ".murmur" / "proxy")
     budget = BudgetState()
     policy = PolicyEngine(contract, budget)
-    events = JsonlRunEventLog(tmp_path / ".chorus" / "proxy-events.jsonl", run_id="proxy")
+    events = JsonlRunEventLog(tmp_path / ".murmur" / "proxy-events.jsonl", run_id="proxy")
     proxy = ContractToolProxy(sandbox=sandbox, policy=policy, budget=budget, events=events)
 
     result = proxy.call("unknown_tool", {})
@@ -310,10 +310,10 @@ def test_tool_proxy_applies_patch_to_utf8_sig_file(tmp_path: Path) -> None:
         command="python -m pytest tests/test_checkout.py -q",
         repo_root=tmp_path,
     )
-    sandbox = LocalWorktreeSandbox.create(tmp_path, tmp_path / ".chorus" / "proxy-bom")
+    sandbox = LocalWorktreeSandbox.create(tmp_path, tmp_path / ".murmur" / "proxy-bom")
     budget = BudgetState()
     policy = PolicyEngine(contract, budget)
-    events = JsonlRunEventLog(tmp_path / ".chorus" / "proxy-bom-events.jsonl", run_id="proxy")
+    events = JsonlRunEventLog(tmp_path / ".murmur" / "proxy-bom-events.jsonl", run_id="proxy")
     proxy = ContractToolProxy(sandbox=sandbox, policy=policy, budget=budget, events=events)
 
     content = proxy.call("read_file", {"path": "checkout.py"})
@@ -464,7 +464,7 @@ def test_workflow_run_cli_writes_node_evidence_and_proof(tmp_path: Path) -> None
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
         ],
     )
 
@@ -500,7 +500,7 @@ def test_workflow_run_cli_denies_forbidden_exec_command(tmp_path: Path) -> None:
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
         ],
     )
 
@@ -541,7 +541,7 @@ def test_workflow_run_cli_blocks_tainted_exec_without_policy(tmp_path: Path) -> 
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
         ],
     )
 
@@ -570,7 +570,7 @@ def test_workflow_run_cli_resumes_completed_node_evidence(tmp_path: Path) -> Non
         "--repo-root",
         str(tmp_path),
         "--out-dir",
-        str(tmp_path / ".chorus" / "runs"),
+        str(tmp_path / ".murmur" / "runs"),
         "--run-id",
         "resume_demo",
     ]
@@ -580,7 +580,7 @@ def test_workflow_run_cli_resumes_completed_node_evidence(tmp_path: Path) -> Non
 
     assert first.exit_code == 0, first.output
     assert second.exit_code == 0, second.output
-    run_dir = tmp_path / ".chorus" / "runs" / "resume_demo"
+    run_dir = tmp_path / ".murmur" / "runs" / "resume_demo"
     events = [
         json.loads(line)
         for line in (run_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
@@ -632,7 +632,7 @@ def test_workflow_runtime_runs_ready_nodes_concurrently(tmp_path: Path) -> None:
     )
     runtime = WorkflowRuntime(
         repo_root=tmp_path,
-        out_root=tmp_path / ".chorus" / "runs",
+        out_root=tmp_path / ".murmur" / "runs",
         registry=registry,
         concurrency=2,
     )
@@ -697,7 +697,7 @@ def test_workflow_runtime_generate_and_map_can_use_model(tmp_path: Path) -> None
     )
     runtime = WorkflowRuntime(
         repo_root=tmp_path,
-        out_root=tmp_path / ".chorus" / "runs",
+        out_root=tmp_path / ".murmur" / "runs",
         model=model,
     )
 
@@ -738,7 +738,7 @@ def test_map_generates_candidates_in_parallel(tmp_path: Path) -> None:
         ),
     )
     runtime = WorkflowRuntime(
-        repo_root=tmp_path, out_root=tmp_path / ".chorus" / "runs", model=_SlowModel()
+        repo_root=tmp_path, out_root=tmp_path / ".murmur" / "runs", model=_SlowModel()
     )
 
     start = _time.time()
@@ -764,7 +764,7 @@ def test_workflow_runtime_tournament_runs_deterministic_bracket(tmp_path: Path) 
             ),
         ),
     )
-    runtime = WorkflowRuntime(repo_root=tmp_path, out_root=tmp_path / ".chorus" / "runs")
+    runtime = WorkflowRuntime(repo_root=tmp_path, out_root=tmp_path / ".murmur" / "runs")
 
     result = runtime.run(workflow, run_id="deterministic_tournament")
 
@@ -791,7 +791,7 @@ def test_workflow_report_includes_tournament_winner_text(tmp_path: Path) -> None
             WorkflowNode(id="report", op="report", inputs=("contest",)),
         ),
     )
-    runtime = WorkflowRuntime(repo_root=tmp_path, out_root=tmp_path / ".chorus" / "runs")
+    runtime = WorkflowRuntime(repo_root=tmp_path, out_root=tmp_path / ".murmur" / "runs")
 
     result = runtime.run(workflow, run_id="winner_report")
 
@@ -841,7 +841,7 @@ def test_workflow_runtime_tournament_can_use_model_judge(tmp_path: Path) -> None
     )
     runtime = WorkflowRuntime(
         repo_root=tmp_path,
-        out_root=tmp_path / ".chorus" / "runs",
+        out_root=tmp_path / ".murmur" / "runs",
         model=model,
     )
 
@@ -979,7 +979,7 @@ def test_planned_coding_workflow_run_uses_contract_tools(tmp_path: Path) -> None
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
             "--agent",
             "scripted",
             "--attempt-concurrency",
@@ -1027,7 +1027,7 @@ def test_generic_writing_workflow_writes_html_and_uses_no_tools(tmp_path: Path) 
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
         ],
     )
 
@@ -1038,7 +1038,7 @@ def test_generic_writing_workflow_writes_html_and_uses_no_tools(tmp_path: Path) 
     assert proof["budget"]["tool_calls"] == 0
     assert proof["tool_summary"]["total"] == 0
     workflow_html = (run_dir / "workflow.html").read_text(encoding="utf-8")
-    assert "CHORUS_AGENT_MAP" in workflow_html
+    assert "MURMUR_AGENT_MAP" in workflow_html
     assert "agent-map-root" in workflow_html
     assert (run_dir / "static" / "agent-map.js").is_file()
 
@@ -1059,7 +1059,7 @@ def test_verify_pr_passes_for_small_safe_diff(tmp_path: Path) -> None:
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "pr-runs"),
+            str(tmp_path / ".murmur" / "pr-runs"),
             "--cmd",
             "python -m pytest tests/test_app.py -q",
         ],
@@ -1100,7 +1100,7 @@ def test_verify_pr_fails_for_forbidden_file(tmp_path: Path) -> None:
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "pr-runs"),
+            str(tmp_path / ".murmur" / "pr-runs"),
         ],
     )
 
@@ -1127,7 +1127,7 @@ def test_verify_pr_fails_for_configured_test(tmp_path: Path) -> None:
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "pr-runs"),
+            str(tmp_path / ".murmur" / "pr-runs"),
             "--cmd",
             "python -m pytest tests/test_app.py -q",
         ],
@@ -1281,14 +1281,14 @@ def test_failure_not_reproduced_exits_nonzero_with_proof(tmp_path: Path) -> None
             "--repo-root",
             str(tmp_path),
             "--out-dir",
-            str(tmp_path / ".chorus" / "runs"),
+            str(tmp_path / ".murmur" / "runs"),
             "--agent",
             "scripted",
         ],
     )
 
     assert result.exit_code == 1
-    proof = next((tmp_path / ".chorus" / "runs").glob("run_*/proof.md"))
+    proof = next((tmp_path / ".murmur" / "runs").glob("run_*/proof.md"))
     assert "failure_not_reproduced" in proof.read_text(encoding="utf-8")
 
 

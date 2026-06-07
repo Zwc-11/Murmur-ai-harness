@@ -8,7 +8,7 @@ import urllib.request
 from functools import partial
 from http.server import ThreadingHTTPServer
 
-from chorus.ui.server import AgentMapPreviewHandler
+from murmur.ui.server import AgentMapPreviewHandler
 
 
 def _read_sse(stream) -> list[tuple[str | None, str]]:

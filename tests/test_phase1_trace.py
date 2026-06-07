@@ -1,6 +1,6 @@
 """Phase 1 trace tests.
 
-Cover the event->span mapping (names + gen_ai.*/chorus.* attributes), failure
+Cover the event->span mapping (names + gen_ai.*/murmur.* attributes), failure
 stamping, replay marking, content-off privacy, and that the emitter drives a
 TracePort with balanced nesting.
 """
@@ -9,22 +9,22 @@ from __future__ import annotations
 
 import asyncio
 
-from chorus.adapters.agents.stochastic import (
+from murmur.adapters.agents.stochastic import (
     MODEL_NAME,
     stochastic_agent_factory,
     stochastic_tools,
 )
-from chorus.adapters.storage.memory import InMemoryEventStore
-from chorus.adapters.trace.memory import InMemoryTraceCollector
-from chorus.core.conductor import RunConductor
-from chorus.core.types import TaskSpec
-from chorus.trace.emit import emit_trace
-from chorus.trace.mapper import events_to_traces
+from murmur.adapters.storage.memory import InMemoryEventStore
+from murmur.adapters.trace.memory import InMemoryTraceCollector
+from murmur.core.conductor import RunConductor
+from murmur.core.types import TaskSpec
+from murmur.trace.emit import emit_trace
+from murmur.trace.mapper import events_to_traces
 
 TASK = TaskSpec(
     task_id="demo.echo_uppercase",
-    prompt="hello chorus",
-    expected_output="HELLO CHORUS",
+    prompt="hello murmur",
+    expected_output="HELLO MURMUR",
 )
 
 
@@ -55,8 +55,8 @@ def test_run_span_uses_gen_ai_invoke_agent() -> None:
     assert root.name == "agent.run"
     assert root.kind == "run"
     assert root.attributes["gen_ai.operation.name"] == "invoke_agent"
-    assert root.attributes["chorus.run.id"] == trace.run_id
-    assert root.attributes["chorus.trajectory.id"] == trace.trajectory_id
+    assert root.attributes["murmur.run.id"] == trace.run_id
+    assert root.attributes["murmur.trajectory.id"] == trace.trajectory_id
     assert root.status == "ok"
 
 
@@ -88,8 +88,8 @@ def test_step_spans_named_with_index_and_phase() -> None:
     steps = [s for s in events_to_traces(events)[0].spans if s.kind == "step"]
     assert steps
     first = steps[0]
-    assert first.attributes["chorus.step.index"] == 0
-    assert first.attributes["chorus.step.phase"] == "plan"
+    assert first.attributes["murmur.step.index"] == 0
+    assert first.attributes["murmur.step.phase"] == "plan"
     assert first.name.startswith("step 0")
 
 
@@ -97,7 +97,7 @@ def test_error_trajectory_stamps_failure_class() -> None:
     events = record(success_rate=0.0, error_rate=1.0)
     trace = events_to_traces(events)[0]
     assert trace.outcome == "error"
-    assert trace.spans[0].attributes["chorus.failure.class"] == "tool_error"
+    assert trace.spans[0].attributes["murmur.failure.class"] == "tool_error"
     erroring = [s for s in trace.spans if s.status == "error" and s.kind == "tool"]
     assert erroring, "the failing tool span should be marked error"
     assert erroring[0].attributes["gen_ai.tool.name"] == "bash"
@@ -107,9 +107,9 @@ def test_replay_marks_every_span() -> None:
     events = record(success_rate=1.0, error_rate=0.0)
     live = events_to_traces(events, replay=False)[0]
     replayed = events_to_traces(events, replay=True)[0]
-    assert all("chorus.replay" not in s.attributes for s in live.spans)
+    assert all("murmur.replay" not in s.attributes for s in live.spans)
     assert replayed.replay is True
-    assert all(s.attributes.get("chorus.replay") is True for s in replayed.spans)
+    assert all(s.attributes.get("murmur.replay") is True for s in replayed.spans)
 
 
 def test_content_stays_off_by_default() -> None:
@@ -119,14 +119,14 @@ def test_content_stays_off_by_default() -> None:
 
     off = events_to_traces(events, capture_content=False)[0]
     blob_off = repr([s.attributes for s in off.spans])
-    assert "hello chorus" not in blob_off
+    assert "hello murmur" not in blob_off
     assert "working on" not in blob_off
-    assert all("chorus.model.content" not in s.attributes for s in off.spans)
-    assert all(not k.startswith("chorus.tool.arg.") for s in off.spans for k in s.attributes)
+    assert all("murmur.model.content" not in s.attributes for s in off.spans)
+    assert all(not k.startswith("murmur.tool.arg.") for s in off.spans for k in s.attributes)
 
     on = events_to_traces(events, capture_content=True)[0]
-    assert _attr_index(on.spans, "chorus.model.content")
-    assert any(k.startswith("chorus.tool.arg.") for s in on.spans for k in s.attributes)
+    assert _attr_index(on.spans, "murmur.model.content")
+    assert any(k.startswith("murmur.tool.arg.") for s in on.spans for k in s.attributes)
 
 
 def test_emitter_drives_port_with_balanced_nesting() -> None:
