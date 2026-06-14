@@ -12,7 +12,7 @@ description = "Open-source reliability harness for cheap coding agents — fan-o
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "Murmur contributors" }]
+authors = [{ name = "Caesar Zhou Wei Chen", email = "caesar.zwc.0611@gmail.com" }]
 dependencies = [
   "typer>=0.12.5",
   "pyyaml>=6.0",
