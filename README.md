@@ -3,12 +3,35 @@ This is the repo entrypoint for humans. It explains what Murmur is, what works
 right now, and the commands needed to install, test, and run the local demo.
 -->
 
-# Murmur
+<h1 align="center">Murmur</h1>
 
-Murmur is a contract and proof layer for AI-generated code changes. It turns a
+<p align="center"><em>Proof, not vibes — a reliability harness for AI coding agents.</em></p>
+
+<p align="center">
+  <a href="https://github.com/Zwc-11/Murmur-ai-harness/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Zwc-11/Murmur-ai-harness/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
+  <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue.svg">
+  <img alt="reliability: pass^k gated" src="https://img.shields.io/badge/reliability-pass%5Ek%20gated-7a3b3b">
+  <img alt="status: contract-first" src="https://img.shields.io/badge/contracts-first-2e7d32">
+</p>
+
+<p align="center">
+  <img src="docs/images/workbench.png" alt="Murmur workbench — the operator map, live agent fan-out, and proof panel" width="100%">
+</p>
+
+Murmur is a **contract and proof layer for AI-generated code changes**. It turns a
 coding task into an enforceable engineering contract, runs an agent through
 policy-controlled tools in an isolated workspace, verifies the resulting diff
 with tests and file/diff rules, and emits a PR-ready proof package.
+
+**What it does**
+
+- **Contract-first** — you declare what success means and what it's allowed to cost; the harness fails closed if the diff violates the contract.
+- **Reliability as a distribution** — runs an agent `N` times and reports `pass@1`, projected and empirical `pass^k`, Wilson CIs, variance, cost, and latency instead of a single lucky pass.
+- **Policy-controlled tools** — typed `list_files` / `search` / `read_file` / `apply_patch` / `run_test` / `git_diff` / `finish`; secrets, destructive shell, network, and unknown edit paths are denied by default.
+- **Proof, not vibes** — every run emits `contract.yaml`, `events.jsonl`, `diff.patch`, `proof.md`, and a `report.html` you can hand to a reviewer.
+- **Statistical CI gate** — blocks a PR only on a *statistically real* `pass^k` regression (paired-delta bootstrap), never on a raw dip.
+- **Self-writing workflows (Flock)** — a planner compiles a task into a typed, schema-validated DAG and fans out cheap, isolated subagents with tournaments and adversarial verification.
 
 The architecture is Python-first. The core is hexagonal: the domain owns
 contracts, events, replay, metrics, and run orchestration; models, agents,
@@ -37,6 +60,19 @@ model designs the workflow from your task. Reasoning/thinking is on by default;
 `DEEPSEEK_MIN_OUTPUT_TOKENS` and `DEEPSEEK_MAX_ESCALATION_TOKENS` tune the safety
 budget that prevents reasoning-starvation, and `DEEPSEEK_THINKING=disabled` turns
 thinking off.
+
+## What it looks like
+
+Everything renders as standalone HUD pages — no server, no build step.
+
+| Reliability report | Trace viewer |
+| --- | --- |
+| [![Reliability fan report](docs/images/fan-report.png)](docs/images/fan-report.png) | [![Trace viewer](docs/images/trace-viewer.png)](docs/images/trace-viewer.png) |
+| `pass@1` · projected-vs-empirical `pass^k` decay · divergence overlay | `gen_ai.*` span waterfall · inspector · replay-verified |
+
+The local workbench (`murmur serve`) is a HUD that turns a natural-language goal into a
+draggable operator map, fans agents out live, and shows the validated artifact, trust
+score, and every gate — the screenshot at the top is a live `deepseek-v4-pro` run.
 
 ## Current slice
 
@@ -320,3 +356,8 @@ This checkout is configured for:
 ```bash
 murmur https://github.com/Zwc-11/Murmur-ai-harness.git
 ```
+
+## Author
+
+Built and maintained by **Caesar Zhou Wei Chen** ([@Zwc-11](https://github.com/Zwc-11)).
+Released under the [MIT License](LICENSE).
