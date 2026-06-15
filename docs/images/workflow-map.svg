@@ -1,130 +1,221 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
-  <title id="title">Murmur agent workflow map preview</title>
-  <desc id="desc">A clean operator map showing a generated agent workflow with dynamic fan-out, validation, repair, rank, and report stages.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 940" role="img" aria-labelledby="title desc">
+  <title id="title">Murmur agent workflow map screenshot</title>
+  <desc id="desc">A clean screenshot-style workflow map for the site_generate_validate_repair workflow, showing classify, acceptance spec, brief, eight generated agent lanes, validation, browser verification, requirement assertions, repair, rank, and report.</desc>
   <defs>
     <linearGradient id="paper" x1="0" x2="0" y1="0" y2="1">
       <stop offset="0" stop-color="#fbfaf6"/>
       <stop offset="1" stop-color="#efeee8"/>
     </linearGradient>
-    <pattern id="grid" width="22" height="22" patternUnits="userSpaceOnUse">
-      <path d="M22 0H0V22" fill="none" stroke="#dedbd2" stroke-width="1"/>
-      <circle cx="0" cy="0" r="1.3" fill="#c9c6bc"/>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="#dedbd2" stroke-width="1"/>
+      <circle cx="0" cy="0" r="1.2" fill="#c9c6bc"/>
     </pattern>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#171717" flood-opacity=".10"/>
     </filter>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path d="M0 0L10 5L0 10Z" fill="#ec1d35"/>
     </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10Z" fill="#5252d8"/>
+    </marker>
+    <style>
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .sans { font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif; }
+      .tiny { font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase; }
+      .label { font-size: 17px; font-weight: 700; fill: #171717; }
+      .meta { font-size: 12px; fill: #65625d; }
+      .node { fill: #fffefb; stroke: #d2d0c8; stroke-width: 1.4; filter: url(#shadow); }
+      .node-red { fill: #fff4f3; stroke: #ec1d35; }
+      .agent { fill: #fbfffb; stroke-width: 1.4; }
+      .line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
   </defs>
-  <rect width="1200" height="720" fill="url(#paper)"/>
-  <rect x="72" y="140" width="700" height="500" fill="url(#grid)" opacity=".78" stroke="#d2d0c8"/>
 
-  <g transform="translate(36 26)">
+  <rect width="1600" height="940" fill="url(#paper)"/>
+  <g transform="translate(48 32)">
     <circle cx="18" cy="18" r="16" fill="none" stroke="#ec1d35" stroke-width="2.4"/>
-    <text x="48" y="29" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="28" letter-spacing="10" fill="#1b1c1d">murmur</text>
-    <text x="700" y="26" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="700" letter-spacing="2.2" fill="#5d5c57">AGENT OPERATOR MAP - WEBSITE_GENERATE_VALIDATE_REPAIR</text>
-    <circle cx="1112" cy="20" r="7" fill="#ec1d35"/>
+    <text x="54" y="30" class="mono" font-size="30" letter-spacing="12" fill="#1b1c1d">murmur</text>
+    <text x="910" y="27" class="mono tiny" font-weight="700" fill="#5d5c57">OPERATOR MAP - SITE_GENERATE_VALIDATE_REPAIR - 8 GENERATED LANES</text>
+    <circle cx="1486" cy="20" r="7" fill="#ec1d35"/>
   </g>
+  <line x1="0" y1="84" x2="1600" y2="84" stroke="#d7d4cc"/>
+  <text x="48" y="126" class="sans" font-size="17" font-style="italic" fill="#6a6962">Every agent lane visible. Every operator accountable.</text>
 
-  <line x1="0" y1="76" x2="1200" y2="76" stroke="#d7d4cc"/>
-  <text x="36" y="110" font-family="ui-serif, Georgia, serif" font-size="16" font-style="italic" fill="#6a6962">A task becomes a visible, inspectable agent workflow.</text>
+  <g transform="translate(72 170)">
+    <rect width="1456" height="690" fill="#fffefb" stroke="#d2d0c8"/>
+    <rect y="0" width="1456" height="56" fill="#fbfaf6" stroke="#d2d0c8"/>
+    <text x="24" y="35" class="mono tiny" font-weight="700" fill="#6e6c66">AGENT OPERATOR MAP</text>
 
-  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
-    <g transform="translate(92 154)">
-      <text x="0" y="0" font-size="14" font-weight="700" letter-spacing="1.6" fill="#6e6c66">TASK CONTRACT</text>
-      <text x="0" y="32" font-size="18" font-weight="700" fill="#151515">SITE_GENERATE_VALIDATE_REPAIR</text>
-      <text x="0" y="58" font-size="13" fill="#5f5d58">Generate a trade simulator, validate in browser, repair failures, report winner.</text>
-      <text x="0" y="86" font-size="13" font-weight="700" fill="#5f5d58">14 modules - 17 flows - 31 gates - dynamic agent count</text>
+    <text x="24" y="96" class="mono" font-size="20" font-weight="700" fill="#151515">SITE_GENERATE_VALIDATE_REPAIR</text>
+    <text x="24" y="126" class="sans" font-size="15" fill="#5f5d58">Extract acceptance criteria, fan out website builds, validate in-browser, repair failed artifacts, rank, and report the best site.</text>
+    <text x="24" y="154" class="mono" font-size="14" font-weight="700" letter-spacing="1.4" fill="#5f5d58">18 MODULES - 25 FLOWS - 81 GATES - GATES CLOSED - PRESS PLAY RUN</text>
+
+    <g transform="translate(24 178)" class="mono">
+      <rect width="94" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="18" y="24" font-size="12" font-weight="700" fill="#343434">CLASSIFY</text>
+      <rect x="108" width="72" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="127" y="24" font-size="12" font-weight="700" fill="#343434">EXEC</text>
+      <rect x="194" width="82" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="211" y="24" font-size="12" font-weight="700" fill="#343434">FILTER</text>
+      <rect x="290" width="106" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="312" y="24" font-size="12" font-weight="700" fill="#343434">GENERATE</text>
+      <rect x="410" width="66" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="430" y="24" font-size="12" font-weight="700" fill="#343434">LOOP</text>
+      <rect x="490" width="62" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="511" y="24" font-size="12" font-weight="700" fill="#343434">MAP</text>
+      <rect x="566" width="72" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="585" y="24" font-size="12" font-weight="700" fill="#343434">RANK</text>
+      <rect x="652" width="88" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="672" y="24" font-size="12" font-weight="700" fill="#343434">REDUCE</text>
+      <rect x="754" width="90" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="774" y="24" font-size="12" font-weight="700" fill="#343434">REPORT</text>
+      <rect x="858" width="122" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="876" y="24" font-size="12" font-weight="700" fill="#343434">TOURNAMENT</text>
+      <rect x="994" width="82" height="36" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="1012" y="24" font-size="12" font-weight="700" fill="#343434">VERIFY</text>
     </g>
 
-    <g stroke="#ec1d35" stroke-width="3" fill="none" marker-end="url(#arrow)">
-      <path d="M172 286H278"/>
-      <path d="M386 286H492"/>
-      <path d="M600 286H706"/>
-      <path d="M386 382C440 382 440 454 494 454"/>
-      <path d="M602 454C658 454 658 382 714 382"/>
-      <path d="M822 382H936"/>
+    <g transform="translate(24 238)">
+      <rect width="1408" height="392" fill="url(#grid)" opacity=".78" stroke="#d2d0c8"/>
+
+      <g class="line" stroke="#ec1d35" marker-end="url(#arrow-red)">
+        <path d="M132 78H220"/>
+        <path d="M132 156H220"/>
+        <path d="M132 234H220"/>
+        <path d="M356 196H448"/>
+        <path d="M600 40H736"/>
+        <path d="M600 84H736"/>
+        <path d="M600 128H736"/>
+        <path d="M600 172H736"/>
+        <path d="M600 216H736"/>
+        <path d="M600 260H736"/>
+        <path d="M600 304H736"/>
+        <path d="M600 348H736"/>
+        <path d="M874 196H980"/>
+        <path d="M1118 196H1226"/>
+      </g>
+      <g class="line" stroke="#5252d8" marker-end="url(#arrow-blue)">
+        <path d="M316 78C380 78 388 196 448 196"/>
+        <path d="M316 156C378 156 388 196 448 196"/>
+        <path d="M560 196C640 196 658 40 736 40"/>
+        <path d="M560 196C640 196 658 84 736 84"/>
+        <path d="M560 196C640 196 658 128 736 128"/>
+        <path d="M560 196H736"/>
+        <path d="M560 196C640 196 658 216 736 216"/>
+        <path d="M560 196C640 196 658 260 736 260"/>
+        <path d="M560 196C640 196 658 304 736 304"/>
+        <path d="M560 196C640 196 658 348 736 348"/>
+      </g>
+
+      <g class="mono">
+        <g transform="translate(28 44)">
+          <rect class="node" width="136" height="64" rx="4"/>
+          <circle cx="18" cy="20" r="5" fill="#6f64c8"/>
+          <text x="32" y="24" class="tiny" font-weight="700" fill="#6e6c66">CLASSIFY</text>
+          <text x="16" y="48" class="label">classify</text>
+        </g>
+        <g transform="translate(28 122)">
+          <rect class="node" width="136" height="64" rx="4"/>
+          <circle cx="18" cy="20" r="5" fill="#6f64c8"/>
+          <text x="32" y="24" class="tiny" font-weight="700" fill="#6e6c66">CLASSIFY</text>
+          <text x="16" y="48" class="label">acceptance</text>
+        </g>
+        <g transform="translate(28 200)">
+          <rect class="node" width="136" height="64" rx="4"/>
+          <circle cx="18" cy="20" r="5" fill="#34a46d"/>
+          <text x="32" y="24" class="tiny" font-weight="700" fill="#6e6c66">GENERATE</text>
+          <text x="16" y="48" class="label">brief</text>
+        </g>
+
+        <g transform="translate(220 152)">
+          <rect class="node node-red" width="154" height="88" rx="4"/>
+          <circle cx="20" cy="24" r="5" fill="#ec1d35"/>
+          <text x="38" y="28" class="tiny" font-weight="700" fill="#ec1d35">MAP - FANOUT</text>
+          <text x="18" y="58" class="label">generate</text>
+          <text x="18" y="76" class="meta">spawn 8 lanes</text>
+        </g>
+
+        <g transform="translate(448 14)">
+          <rect class="agent" width="152" height="34" rx="5" stroke="#3ca46c"/>
+          <text x="18" y="23" font-size="14" font-weight="700" fill="#171717">agent 1</text>
+        </g>
+        <g transform="translate(448 58)">
+          <rect class="agent" width="152" height="34" rx="5" stroke="#59a578"/>
+          <text x="18" y="23" font-size="14" font-weight="700" fill="#171717">agent 2</text>
+        </g>
+        <g transform="translate(448 102)">
+          <rect class="agent" width="152" height="34" rx="5" stroke="#8aa95a"/>
+          <text x="18" y="23" font-size="14" font-weight="700" fill="#171717">agent 3</text>
+        </g>
+        <g transform="translate(448 146)">
+          <rect class="agent" width="152" height="34" rx="5" stroke="#b7a244"/>
+          <text x="18" y="23" font-size="14" font-weight="700" fill="#171717">agent 4</text>
+        </g>
+        <g transform="translate(448 190)">
+          <rect class="agent" width="152" height="34" rx="5" stroke="#cd8a3b"/>
+          <text x="18" y="23" font-size="14" font-weight="700" fill="#171717">agent 5</text>
+        </g>
+        <g transform="translate(448 234)">
+          <rect class="agent" width="152" height="34" rx="5" stroke="#d96b53"/>
+          <text x="18" y="23" font-size="14" font-weight="700" fill="#171717">agent 6</text>
+        </g>
+        <g transform="translate(448 278)">
+          <rect class="agent" width="152" height="34" rx="5" stroke="#d55183"/>
+          <text x="18" y="23" font-size="14" font-weight="700" fill="#171717">agent 7</text>
+        </g>
+        <g transform="translate(448 322)">
+          <rect class="agent" width="152" height="34" rx="5" stroke="#bd4dc9"/>
+          <text x="18" y="23" font-size="14" font-weight="700" fill="#171717">agent 8</text>
+        </g>
+
+        <g transform="translate(736 152)">
+          <rect class="node" width="170" height="88" rx="4"/>
+          <circle cx="20" cy="24" r="5" fill="#ec1d35"/>
+          <text x="38" y="28" class="tiny" font-weight="700" fill="#ec1d35">VERIFY - COMBINE</text>
+          <text x="18" y="58" class="label">validate_site</text>
+          <text x="18" y="76" class="meta">merge lane outputs</text>
+        </g>
+
+        <g transform="translate(980 68)">
+          <rect class="node" width="170" height="68" rx="4"/>
+          <circle cx="20" cy="22" r="5" fill="#ec1d35"/>
+          <text x="38" y="26" class="tiny" font-weight="700" fill="#ec1d35">VERIFY</text>
+          <text x="18" y="52" class="label">browser_verify</text>
+        </g>
+        <g transform="translate(980 158)">
+          <rect class="node node-red" width="170" height="68" rx="4"/>
+          <circle cx="20" cy="22" r="5" fill="#ec1d35"/>
+          <text x="38" y="26" class="tiny" font-weight="700" fill="#ec1d35">VERIFY</text>
+          <text x="18" y="52" class="label">requirement_assert</text>
+        </g>
+        <g transform="translate(980 248)">
+          <rect class="node" width="170" height="68" rx="4"/>
+          <circle cx="20" cy="22" r="5" fill="#a05bc8"/>
+          <text x="38" y="26" class="tiny" font-weight="700" fill="#6e6c66">LOOP - COMBINE</text>
+          <text x="18" y="52" class="label">repair_loop</text>
+        </g>
+
+        <g transform="translate(1226 120)">
+          <rect class="node" width="150" height="68" rx="4"/>
+          <circle cx="20" cy="22" r="5" fill="#cc8a30"/>
+          <text x="38" y="26" class="tiny" font-weight="700" fill="#6e6c66">RANK</text>
+          <text x="18" y="52" class="label">rank</text>
+        </g>
+        <g transform="translate(1226 212)">
+          <rect class="node" width="150" height="68" rx="4"/>
+          <circle cx="20" cy="22" r="5" fill="#655bc8"/>
+          <text x="38" y="26" class="tiny" font-weight="700" fill="#6e6c66">REPORT</text>
+          <text x="18" y="52" class="label">report</text>
+        </g>
+      </g>
     </g>
 
-    <g filter="url(#shadow)">
-      <g transform="translate(92 244)">
-        <rect width="126" height="84" rx="5" fill="#fffefb" stroke="#d2d0c8"/>
-        <circle cx="20" cy="22" r="5" fill="#2f7f3b"/>
-        <text x="36" y="26" font-size="12" font-weight="700" fill="#6e6c66">CLASSIFY</text>
-        <text x="18" y="54" font-size="13" fill="#171717">acceptance</text>
-        <text x="18" y="72" font-size="12" fill="#77746d">0.4s</text>
-      </g>
-      <g transform="translate(306 244)">
-        <rect width="126" height="84" rx="5" fill="#fffefb" stroke="#d2d0c8"/>
-        <circle cx="20" cy="22" r="5" fill="#2f7f3b"/>
-        <text x="36" y="26" font-size="12" font-weight="700" fill="#6e6c66">GENERATE</text>
-        <text x="18" y="54" font-size="13" fill="#171717">fan-out x30</text>
-        <text x="18" y="72" font-size="12" fill="#77746d">parallel</text>
-      </g>
-      <g transform="translate(520 244)">
-        <rect width="126" height="84" rx="5" fill="#fffefb" stroke="#d2d0c8"/>
-        <circle cx="20" cy="22" r="5" fill="#d06a00"/>
-        <text x="36" y="26" font-size="12" font-weight="700" fill="#6e6c66">VERIFY</text>
-        <text x="18" y="54" font-size="13" fill="#171717">browser gates</text>
-        <text x="18" y="72" font-size="12" fill="#77746d">contract.check</text>
-      </g>
-      <g transform="translate(734 244)">
-        <rect width="126" height="84" rx="5" fill="#fff4f3" stroke="#ec1d35"/>
-        <circle cx="20" cy="22" r="5" fill="#ec1d35"/>
-        <text x="36" y="26" font-size="12" font-weight="700" fill="#ec1d35">REPAIR</text>
-        <text x="18" y="54" font-size="13" fill="#171717">fix missing UI</text>
-        <text x="18" y="72" font-size="12" fill="#77746d">retry bounded</text>
-      </g>
-      <g transform="translate(520 412)">
-        <rect width="126" height="84" rx="5" fill="#fffefb" stroke="#d2d0c8"/>
-        <circle cx="20" cy="22" r="5" fill="#2f7f3b"/>
-        <text x="36" y="26" font-size="12" font-weight="700" fill="#6e6c66">RANK</text>
-        <text x="18" y="54" font-size="13" fill="#171717">score winners</text>
-        <text x="18" y="72" font-size="12" fill="#77746d">trust score</text>
-      </g>
-      <g transform="translate(734 340)">
-        <rect width="126" height="84" rx="5" fill="#fffefb" stroke="#d2d0c8"/>
-        <circle cx="20" cy="22" r="5" fill="#2f7f3b"/>
-        <text x="36" y="26" font-size="12" font-weight="700" fill="#6e6c66">REDUCE</text>
-        <text x="18" y="54" font-size="13" fill="#171717">merge lanes</text>
-        <text x="18" y="72" font-size="12" fill="#77746d">winner only</text>
-      </g>
-      <g transform="translate(948 340)">
-        <rect width="126" height="84" rx="5" fill="#fffefb" stroke="#d2d0c8"/>
-        <circle cx="20" cy="22" r="5" fill="#2f7f3b"/>
-        <text x="36" y="26" font-size="12" font-weight="700" fill="#6e6c66">REPORT</text>
-        <text x="18" y="54" font-size="13" fill="#171717">proof package</text>
-        <text x="18" y="72" font-size="12" fill="#77746d">fan + trace</text>
-      </g>
-    </g>
-
-    <g transform="translate(122 562)">
-      <rect width="86" height="24" rx="12" fill="#ec1d35"/>
-      <rect x="76" width="86" height="24" rx="12" fill="#b048c7"/>
-      <rect x="152" width="86" height="24" rx="12" fill="#634ad9"/>
-      <text x="262" y="17" font-size="13" fill="#5f5d58">30 generated trajectories collapse into one accepted artifact.</text>
-    </g>
-
-    <g transform="translate(812 140)">
-      <rect width="316" height="500" rx="6" fill="#fffefb" stroke="#d2d0c8" filter="url(#shadow)"/>
-      <text x="26" y="42" font-size="15" font-weight="700" letter-spacing="1.4" fill="#151515">RUN RESULT</text>
-      <text x="26" y="70" font-size="13" fill="#5f5d58">Live run - winner generate_7</text>
-      <rect x="26" y="104" width="264" height="34" fill="#f4fff5" stroke="#2f7f3b"/>
-      <text x="42" y="126" font-size="12" font-weight="700" fill="#2f7f3b">ACCEPTANCE PASSED</text>
-      <text x="26" y="168" font-size="13" font-weight="700" fill="#151515">workflow progress</text>
-      <rect x="26" y="186" width="264" height="12" fill="#e8e6df"/>
-      <rect x="26" y="186" width="214" height="12" fill="#ec1d35"/>
-      <text x="26" y="224" font-size="13" fill="#5f5d58">31 gates evaluated</text>
-      <text x="26" y="248" font-size="13" fill="#5f5d58">dynamic agents tracked</text>
-      <text x="26" y="290" font-size="13" font-weight="700" fill="#151515">selected artifact</text>
-      <rect x="26" y="310" width="264" height="112" fill="#11151b"/>
-      <rect x="44" y="330" width="34" height="34" rx="6" fill="#12251b" stroke="#45c77a"/>
-      <path d="M54 347L64 357L76 337" fill="none" stroke="#45c77a" stroke-width="4"/>
-      <text x="92" y="352" font-size="18" font-weight="700" fill="#ffffff">Murmur</text>
-      <rect x="92" y="374" width="150" height="22" rx="11" fill="#253044"/>
-      <text x="108" y="390" font-size="11" fill="#c8d1e1">PROOF-BACKED RESULT</text>
-      <text x="26" y="464" font-size="12" fill="#77746d">Open Website - site/index.html</text>
+    <g transform="translate(24 648)">
+      <text class="mono tiny" font-weight="700" fill="#6e6c66">RUN RESULT</text>
+      <rect x="0" y="22" width="344" height="38" fill="#f4fff5" stroke="#2f7f3b"/>
+      <text x="18" y="47" class="mono" font-size="13" font-weight="700" fill="#2f7f3b">PREVIEW PLAYBACK - WINNER AGENT 2</text>
+      <text x="390" y="47" class="sans" font-size="15" fill="#5f5d58">The real app exposes every operator and generated lane before acceptance, repair, rank, and reporting.</text>
     </g>
   </g>
 </svg>

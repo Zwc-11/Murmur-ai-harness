@@ -57,7 +57,7 @@ ticket controls and did not update visible state after buy/sell actions.
 
 | Agent workflow map | Reliability report | Trace viewer |
 | --- | --- | --- |
-| [![Agent workflow map showing classify, generate, verify, repair, rank, and report nodes](docs/images/workflow-map.svg)](docs/images/workflow-map.svg) | [![Reliability report showing pass@1, pass^k decay, failures, workflow progress, and divergence lanes](docs/images/fan-report.svg)](docs/images/fan-report.svg) | [![Trace viewer showing selectable agent trajectories, workflow spans, thinking events, and inspector metadata](docs/images/trace-viewer.svg)](docs/images/trace-viewer.svg) |
+| [![Agent workflow map showing acceptance spec, brief, generate fan-out, validation, repair, rank, and report nodes](docs/images/workflow-map.svg)](docs/images/workflow-map.svg) | [![Reliability report showing pass@1, pass^k decay, failures, workflow progress, and divergence lanes](docs/images/fan-report.svg)](docs/images/fan-report.svg) | [![Trace viewer showing selectable agent trajectories, workflow spans, thinking events, and inspector metadata](docs/images/trace-viewer.svg)](docs/images/trace-viewer.svg) |
 | Live operator DAG with dynamic agent fan-out | Distribution-level reliability and failure summary | Per-agent span waterfall with selected trajectory evidence |
 
 ## Quickstart
