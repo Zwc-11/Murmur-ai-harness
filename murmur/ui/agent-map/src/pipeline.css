@@ -1,0 +1,26 @@
+.am-pipeline-edge {
+  pointer-events: none;
+  filter: saturate(1.08);
+}
+
+.am-pipeline-edge--idle {
+  opacity: 0.82;
+}
+
+.am-pipeline-edge--hot {
+  filter: saturate(1.18) drop-shadow(0 0 7px rgba(82, 82, 216, 0.2));
+}
+
+.am-pipeline-edge--fanout,
+.am-pipeline-edge--combine_in {
+  mix-blend-mode: multiply;
+}
+
+.am-pipeline-dash {
+  animation: am-pipeline-flow 1.65s linear infinite;
+}
+
+.am-pipeline-dash--idle {
+  animation-duration: 6.5s;
+  animation-direction: reverse;
+}
