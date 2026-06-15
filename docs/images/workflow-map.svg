@@ -13,12 +13,6 @@
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#171717" flood-opacity=".10"/>
     </filter>
-    <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-      <path d="M0 0L10 5L0 10Z" fill="#ec1d35"/>
-    </marker>
-    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-      <path d="M0 0L10 5L0 10Z" fill="#5252d8"/>
-    </marker>
     <style>
       .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
       .sans { font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif; }
@@ -28,7 +22,12 @@
       .node { fill: #fffefb; stroke: #d2d0c8; stroke-width: 1.4; filter: url(#shadow); }
       .node-red { fill: #fff4f3; stroke: #ec1d35; }
       .agent { fill: #fbfffb; stroke-width: 1.4; }
-      .line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+      .line path { fill: none; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 22 14 5 14; animation: pipe-flow 4.5s linear infinite; opacity: .82; }
+      .line path:nth-child(2n) { animation-delay: -1.2s; }
+      .line-red path { stroke: #ec1d35; filter: drop-shadow(0 0 8px rgba(236, 29, 53, .35)); }
+      .line-blue path { stroke: #5252d8; animation-duration: 3.8s; filter: drop-shadow(0 0 9px rgba(82, 82, 216, .35)); }
+      @keyframes pipe-flow { to { stroke-dashoffset: -55; } }
+      @media (prefers-reduced-motion: reduce) { .line path { animation: none; } }
     </style>
   </defs>
 
@@ -79,7 +78,7 @@
     <g transform="translate(24 238)">
       <rect width="1408" height="392" fill="url(#grid)" opacity=".78" stroke="#d2d0c8"/>
 
-      <g class="line" stroke="#ec1d35" marker-end="url(#arrow-red)">
+      <g class="line line-red">
         <path d="M132 78H220"/>
         <path d="M132 156H220"/>
         <path d="M132 234H220"/>
@@ -95,7 +94,7 @@
         <path d="M874 196H980"/>
         <path d="M1118 196H1226"/>
       </g>
-      <g class="line" stroke="#5252d8" marker-end="url(#arrow-blue)">
+      <g class="line line-blue">
         <path d="M316 78C380 78 388 196 448 196"/>
         <path d="M316 156C378 156 388 196 448 196"/>
         <path d="M560 196C640 196 658 40 736 40"/>
