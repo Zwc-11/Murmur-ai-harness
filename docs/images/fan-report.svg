@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Murmur reliability report preview</title>
+  <desc id="desc">A clean reliability report dashboard with pass rates, projected pass to the k, workflow progress, event ledger, and failure evidence.</desc>
+  <defs>
+    <linearGradient id="paper" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#fbfaf6"/>
+      <stop offset="1" stop-color="#f1f0eb"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#171717" flood-opacity=".10"/>
+    </filter>
+    <pattern id="scan" width="8" height="8" patternUnits="userSpaceOnUse">
+      <path d="M0 7.5H8" stroke="#dedbd2" stroke-opacity=".45" stroke-width=".7"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="720" fill="url(#paper)"/>
+  <rect width="1200" height="720" fill="url(#scan)" opacity=".55"/>
+
+  <g transform="translate(36 26)">
+    <circle cx="18" cy="18" r="16" fill="none" stroke="#ec1d35" stroke-width="2.4"/>
+    <text x="48" y="29" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="28" letter-spacing="10" fill="#1b1c1d">murmur</text>
+    <text x="718" y="26" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="700" letter-spacing="2.4" fill="#5d5c57">HARD.WEBSITE_GENERATE_VALIDATE_REPAIR  -  RUN_20260614  -  N=30</text>
+    <circle cx="1112" cy="20" r="7" fill="#ec1d35"/>
+  </g>
+
+  <line x1="0" y1="76" x2="1200" y2="76" stroke="#d7d4cc"/>
+  <text x="36" y="110" font-family="ui-serif, Georgia, serif" font-size="16" font-style="italic" fill="#6a6962">Reliability is a distribution, not one lucky pass.</text>
+
+  <g filter="url(#softShadow)">
+    <rect x="96" y="140" width="1008" height="468" rx="6" fill="#fffefb" stroke="#d2d0c8"/>
+  </g>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <g transform="translate(96 140)">
+      <rect width="252" height="118" fill="#fffefb" stroke="#d2d0c8"/>
+      <rect x="252" width="252" height="118" fill="#fffefb" stroke="#d2d0c8"/>
+      <rect x="504" width="252" height="118" fill="#fffefb" stroke="#d2d0c8"/>
+      <rect x="756" width="252" height="118" fill="#fffefb" stroke="#d2d0c8"/>
+      <text x="24" y="36" font-size="15" font-weight="700" letter-spacing="1.5" fill="#72706a">PASS@1</text>
+      <text x="24" y="82" font-size="40" fill="#101112">0.63</text>
+      <text x="24" y="105" font-size="14" fill="#64625d">95% CI 0.45-0.78</text>
+      <text x="276" y="36" font-size="15" font-weight="700" letter-spacing="1.5" fill="#72706a">PASS^K PROJECTED</text>
+      <text x="276" y="82" font-size="40" fill="#101112">0.013</text>
+      <text x="276" y="105" font-size="14" fill="#64625d">k = 30, correlated</text>
+      <text x="528" y="36" font-size="15" font-weight="700" letter-spacing="1.5" fill="#72706a">VARIANCE</text>
+      <text x="528" y="82" font-size="40" fill="#101112">0.18</text>
+      <text x="528" y="105" font-size="14" fill="#64625d">across 30 runs</text>
+      <text x="780" y="36" font-size="15" font-weight="700" letter-spacing="1.5" fill="#72706a">FAILURES</text>
+      <text x="780" y="82" font-size="40" fill="#101112">11 / 30</text>
+      <text x="780" y="105" font-size="14" fill="#64625d">8 fail - 3 error</text>
+    </g>
+
+    <g transform="translate(128 292)">
+      <text x="0" y="-18" font-size="14" font-weight="700" letter-spacing="1.4" fill="#6e6c66">PASS^K DECAY - PROJECTED VS EMPIRICAL</text>
+      <line x1="0" y1="0" x2="736" y2="0" stroke="#d8d5cc"/>
+      <line x1="0" y1="64" x2="736" y2="64" stroke="#d8d5cc"/>
+      <line x1="0" y1="128" x2="736" y2="128" stroke="#d8d5cc"/>
+      <line x1="0" y1="192" x2="736" y2="192" stroke="#d8d5cc"/>
+      <path d="M0 20 C82 72 112 106 190 128 C280 154 376 171 516 184 C610 190 680 192 736 193" fill="none" stroke="#151515" stroke-width="3"/>
+      <path d="M0 22 C78 80 126 116 200 141 C282 166 388 181 520 188 C620 192 686 194 736 195" fill="none" stroke="#ec1d35" stroke-width="3" stroke-dasharray="8 8"/>
+      <g fill="#ec1d35">
+        <circle cx="0" cy="22" r="6"/><circle cx="78" cy="80" r="6"/><circle cx="126" cy="116" r="6"/><circle cx="200" cy="141" r="6"/><circle cx="282" cy="166" r="6"/><circle cx="388" cy="181" r="6"/><circle cx="520" cy="188" r="6"/><circle cx="620" cy="192" r="6"/><circle cx="736" cy="195" r="6"/>
+      </g>
+      <rect x="610" y="0" width="126" height="192" fill="#ec1d35" opacity=".12"/>
+      <text x="628" y="28" font-size="12" font-weight="700" fill="#ec1d35">data cannot support</text>
+      <text x="-38" y="6" font-size="13" fill="#6d6a63">1.00</text>
+      <text x="-38" y="70" font-size="13" fill="#6d6a63">0.75</text>
+      <text x="-38" y="134" font-size="13" fill="#6d6a63">0.50</text>
+      <text x="-38" y="198" font-size="13" fill="#6d6a63">0.00</text>
+      <text x="0" y="226" font-size="13" fill="#6d6a63">k1</text>
+      <text x="186" y="226" font-size="13" fill="#6d6a63">k10</text>
+      <text x="376" y="226" font-size="13" fill="#6d6a63">k20</text>
+      <text x="718" y="226" font-size="13" fill="#6d6a63">k30</text>
+    </g>
+
+    <g transform="translate(900 292)">
+      <rect width="164" height="38" fill="#fffefb" stroke="#2f7f3b"/>
+      <text x="16" y="24" font-size="13" font-weight="700" fill="#2f7f3b">WORKFLOW LIVE</text>
+      <text x="0" y="70" font-size="14" font-weight="700" fill="#161718">agent-map progress</text>
+      <text x="0" y="94" font-size="13" fill="#5f5d58">17 flows - 31 gates</text>
+      <text x="0" y="118" font-size="13" fill="#5f5d58">dynamic agents observed</text>
+      <g transform="translate(0 146)">
+        <rect width="164" height="12" fill="#e8e6df"/>
+        <rect width="118" height="12" fill="#ec1d35"/>
+        <text x="0" y="38" font-size="12" fill="#5f5d58">generate -> verify -> repair</text>
+      </g>
+      <g transform="translate(0 220)">
+        <text x="0" y="0" font-size="14" font-weight="700" fill="#161718">failure evidence</text>
+        <rect y="18" width="164" height="64" fill="#fff4f3" stroke="#ec1d35"/>
+        <text x="12" y="42" font-size="12" fill="#ec1d35">missing ticket controls</text>
+        <text x="12" y="64" font-size="12" fill="#ec1d35">no visible state update</text>
+      </g>
+    </g>
+
+    <g transform="translate(128 560)">
+      <text x="0" y="-24" font-size="14" font-weight="700" letter-spacing="1.4" fill="#6e6c66">EVENT LEDGER - AGREEMENT STRIP + LANES</text>
+      <text x="0" y="28" font-size="18" fill="#353431">agree</text>
+      <rect x="120" y="0" width="86" height="42" rx="3" fill="#33332e"/>
+      <rect x="220" y="0" width="86" height="42" rx="3" fill="#33332e"/>
+      <rect x="320" y="0" width="86" height="42" rx="3" fill="#33332e"/>
+      <rect x="420" y="0" width="86" height="42" rx="3" fill="#33332e"/>
+      <rect x="526" y="-8" width="78" height="58" fill="#ec1d35" opacity=".12"/>
+      <rect x="526" y="20" width="80" height="22" rx="3" fill="#d06a00"/>
+      <rect x="624" y="24" width="80" height="18" rx="3" fill="#d06a00"/>
+      <rect x="724" y="18" width="80" height="24" rx="3" fill="#d06a00"/>
+      <rect x="824" y="20" width="80" height="22" rx="3" fill="#d06a00"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Murmur trace viewer preview</title>
+  <desc id="desc">A clean trace viewer with selectable trajectories, per-agent thinking and tool spans, and a detailed inspector for the selected span.</desc>
+  <defs>
+    <linearGradient id="paper" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#fbfaf6"/>
+      <stop offset="1" stop-color="#eeeeea"/>
+    </linearGradient>
+    <pattern id="scan" width="8" height="8" patternUnits="userSpaceOnUse">
+      <path d="M0 7.5H8" stroke="#dedbd2" stroke-opacity=".45" stroke-width=".7"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="720" fill="url(#paper)"/>
+  <rect width="1200" height="720" fill="url(#scan)" opacity=".55"/>
+
+  <g transform="translate(36 26)">
+    <circle cx="18" cy="18" r="16" fill="none" stroke="#ec1d35" stroke-width="2.4"/>
+    <text x="48" y="29" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="28" letter-spacing="10" fill="#1b1c1d">murmur</text>
+    <text x="742" y="26" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="700" letter-spacing="2.4" fill="#5d5c57">TRACE  -  RUN_20260614  -  30 TRAJECTORIES</text>
+    <circle cx="1112" cy="20" r="7" fill="#ec1d35"/>
+  </g>
+
+  <line x1="0" y1="76" x2="1200" y2="76" stroke="#d7d4cc"/>
+  <text x="36" y="110" font-family="ui-serif, Georgia, serif" font-size="16" font-style="italic" fill="#6a6962">Every trajectory is selectable. Every step keeps its evidence.</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <rect x="0" y="132" width="214" height="524" fill="#f5f3ee" stroke="#d2d0c8"/>
+    <text x="18" y="162" font-size="13" font-weight="700" letter-spacing="1.6" fill="#6e6c66">TRAJECTORIES - 30</text>
+    <rect x="0" y="178" width="214" height="42" fill="#f8d9da"/>
+    <rect x="0" y="178" width="4" height="42" fill="#ec1d35"/>
+    <g font-size="14" font-weight="700">
+      <text x="18" y="204" fill="#101112">o</text><text x="46" y="204" fill="#101112">#01</text><text x="158" y="204" fill="#77746d">4.91s</text>
+      <text x="18" y="246" fill="#101112">o</text><text x="46" y="246" fill="#101112">#02</text><text x="158" y="246" fill="#77746d">6.81s</text>
+      <text x="18" y="288" fill="#101112">o</text><text x="46" y="288" fill="#101112">#03</text><text x="158" y="288" fill="#77746d">5.51s</text>
+      <text x="18" y="330" fill="#ec1d35">o</text><text x="46" y="330" fill="#101112">#04</text><text x="158" y="330" fill="#77746d">8.42s</text>
+      <text x="18" y="372" fill="#101112">o</text><text x="46" y="372" fill="#101112">#05</text><text x="158" y="372" fill="#77746d">3.07s</text>
+      <text x="18" y="414" fill="#d06a00">o</text><text x="46" y="414" fill="#101112">#06</text><text x="158" y="414" fill="#77746d">7.12s</text>
+      <text x="18" y="456" fill="#101112">o</text><text x="46" y="456" fill="#101112">#07</text><text x="158" y="456" fill="#77746d">4.60s</text>
+      <text x="18" y="498" fill="#ec1d35">o</text><text x="46" y="498" fill="#101112">#08</text><text x="158" y="498" fill="#77746d">9.05s</text>
+      <text x="18" y="540" fill="#101112">o</text><text x="46" y="540" fill="#101112">#09</text><text x="158" y="540" fill="#77746d">5.86s</text>
+      <text x="18" y="582" fill="#101112">o</text><text x="46" y="582" fill="#101112">#10</text><text x="158" y="582" fill="#77746d">6.41s</text>
+    </g>
+
+    <rect x="214" y="132" width="730" height="524" fill="#fffefb" stroke="#d2d0c8"/>
+    <text x="238" y="162" font-size="14" font-weight="700" fill="#3b3b37">trajectory #01</text>
+    <text x="350" y="162" font-size="14" font-weight="700" fill="#3b3b37">4.91s</text>
+    <text x="410" y="162" font-size="14" font-weight="700" fill="#3b3b37">7.4k tok</text>
+    <rect x="498" y="142" width="84" height="24" fill="#fff4f3" stroke="#ec1d35"/>
+    <text x="516" y="158" font-size="12" font-weight="700" fill="#ec1d35">REPLAYED</text>
+
+    <g transform="translate(244 190)">
+      <rect x="-30" y="-12" width="730" height="34" fill="#f8d9da"/>
+      <text x="0" y="10" font-size="15" fill="#101112">agent.run</text>
+      <rect x="250" y="-2" width="530" height="16" fill="#d8d7d2" stroke="#c5c2ba"/>
+      <rect x="250" y="-2" width="476" height="16" fill="#87877f"/>
+      <text x="616" y="10" font-size="12" fill="#77746d">4.91s</text>
+
+      <text x="20" y="50" font-size="14" fill="#373733">&gt; step 0 - plan</text>
+      <rect x="250" y="36" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="250" y="36" width="158" height="16" fill="#cfcfc9"/>
+      <text x="596" y="50" font-size="12" fill="#77746d">1.45s</text>
+      <text x="40" y="88" font-size="14" fill="#373733">thinking: acceptance criteria</text>
+      <rect x="250" y="74" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="250" y="74" width="194" height="16" fill="#191919"/>
+      <text x="578" y="88" font-size="12" fill="#77746d">1173 tok</text>
+      <text x="40" y="126" font-size="14" fill="#373733">tool: execute read_file</text>
+      <rect x="250" y="112" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="444" y="112" width="8" height="16" fill="#85857f"/>
+
+      <text x="20" y="176" font-size="14" fill="#373733">&gt; step 1 - act</text>
+      <rect x="250" y="162" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="408" y="162" width="72" height="16" fill="#cfcfc9"/>
+      <text x="40" y="214" font-size="14" fill="#373733">thinking: build simulator</text>
+      <rect x="250" y="200" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="408" y="200" width="72" height="16" fill="#191919"/>
+      <text x="578" y="214" font-size="12" fill="#77746d">1582 tok</text>
+      <text x="40" y="252" font-size="14" fill="#373733">tool: execute write_site</text>
+      <rect x="250" y="238" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="480" y="238" width="8" height="16" fill="#85857f"/>
+
+      <text x="20" y="302" font-size="14" fill="#373733">&gt; step 2 - verify</text>
+      <rect x="250" y="288" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="480" y="288" width="164" height="16" fill="#cfcfc9"/>
+      <text x="40" y="340" font-size="14" fill="#373733">thinking: browser findings</text>
+      <rect x="250" y="326" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="480" y="326" width="122" height="16" fill="#191919"/>
+      <text x="578" y="340" font-size="12" fill="#77746d">896 tok</text>
+      <text x="40" y="378" font-size="14" fill="#ec1d35">tool: contract.check failed</text>
+      <rect x="250" y="364" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="602" y="364" width="12" height="16" fill="#ec1d35"/>
+
+      <text x="20" y="428" font-size="14" fill="#373733">&gt; step 3 - repair</text>
+      <rect x="250" y="414" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="614" y="414" width="96" height="16" fill="#cfcfc9"/>
+      <text x="40" y="466" font-size="14" fill="#373733">thinking: retry scope</text>
+      <rect x="250" y="452" width="530" height="16" fill="#ecebe7" stroke="#c5c2ba"/>
+      <rect x="614" y="452" width="96" height="16" fill="#191919"/>
+    </g>
+
+    <rect x="944" y="132" width="256" height="524" fill="#fffefb" stroke="#d2d0c8"/>
+    <text x="966" y="162" font-size="13" font-weight="700" letter-spacing="1.6" fill="#6e6c66">INSPECTOR - SELECTED SPAN</text>
+    <text x="966" y="214" font-size="18" font-weight="700" fill="#161718">contract.check</text>
+    <text x="966" y="242" font-size="13" fill="#5f5d58">run - 4.91s @ 3.88s</text>
+    <text x="966" y="286" font-size="12" font-weight="700" fill="#6e6c66">murmur.agent.id</text>
+    <text x="966" y="306" font-size="12" fill="#171717">generate_7</text>
+    <text x="966" y="342" font-size="12" font-weight="700" fill="#6e6c66">status</text>
+    <text x="966" y="362" font-size="12" fill="#ec1d35">failed</text>
+    <text x="966" y="398" font-size="12" font-weight="700" fill="#6e6c66">diagnostic</text>
+    <text x="966" y="418" font-size="12" fill="#171717">missing_trade_ticket_controls</text>
+    <text x="966" y="454" font-size="12" font-weight="700" fill="#6e6c66">visible evidence</text>
+    <rect x="966" y="470" width="198" height="82" fill="#fff4f3" stroke="#ec1d35"/>
+    <text x="980" y="496" font-size="12" fill="#ec1d35">Buy/sell actions do not update</text>
+    <text x="980" y="516" font-size="12" fill="#ec1d35">order state or ticket controls.</text>
+    <rect x="966" y="582" width="134" height="34" fill="#fffefb" stroke="#d2d0c8"/>
+    <text x="984" y="604" font-size="12" font-weight="700" fill="#161718">EXPAND IN MODAL</text>
+  </g>
+
+  <line x1="0" y1="656" x2="1200" y2="656" stroke="#d2d0c8"/>
+  <text x="36" y="696" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24" letter-spacing="8" fill="#353431">trace</text>
+  <circle cx="146" cy="688" r="13" fill="none" stroke="#191919" stroke-width="5"/>
+  <text x="966" y="694" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="700" letter-spacing="1.8" fill="#6e6c66">MONO - MACHINE VALUES - ROUND NUMBERS</text>
+</svg>

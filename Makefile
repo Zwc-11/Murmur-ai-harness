@@ -1,5 +1,5 @@
 # Small command shortcuts for local development.
-# These targets wrap the exact Python commands we expect contributors to run.
+# These targets wrap the exact Python commands used for local project checks.
 PYTHON ?= python
 
 .PHONY: install test lint format demo replay run trace gate langsmith
