@@ -1,5 +1,6 @@
 # Local files that should not be committed.
 # These are build outputs, caches, virtual environments, and private env files.
+.tmp/
 .venv/
 .venv-linux/
 .chorus/
