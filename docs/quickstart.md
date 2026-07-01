@@ -62,19 +62,21 @@ Supported public adapter surfaces:
 - Google ADK trace import.
 - LangGraph `astream_events` live adapter and trace import.
 
-## 4. Run A Public Benchmark
+## 4. Run A Real-Model Benchmark
 
-Use public benchmarks only for real measured claims. SWE-bench Verified is useful
-for calibration, but current frontier claims should prefer fresher or harder
-sets such as SWE-bench Pro, SWE-rebench, or Terminal-Bench when available.
+Use real benchmarks only for real measured claims. For the hard landing-site
+task with DeepSeek, follow the step-by-step
+[runbook](benchmarks/RUNBOOK.md) (`murmur doctor --ping`, then
+`murmur agents run deepseek-website --n 10 --task hard`).
+
+For SWE-bench Verified, the gate runs a real agent + the official Docker
+evaluator:
 
 ```bash
 python -m pip install -e ".[bench]"
-export ANTHROPIC_API_KEY=...
-murmur bench --subset 50 --n 10 --k 5 \
-  --scaffold-a single-shot \
-  --scaffold-b self-repair
+export DEEPSEEK_API_KEY=...   # or ANTHROPIC_API_KEY + MURMUR_MODEL_PROVIDER=anthropic
+murmur gate --suite swe-bench-verified --real-agent --n 10 --k 5
 ```
 
-If Docker, a dataset, or a real model key is missing, Murmur exits instead of
+If Docker, the dataset, or a real model key is missing, Murmur exits instead of
 printing a fake benchmark number.
