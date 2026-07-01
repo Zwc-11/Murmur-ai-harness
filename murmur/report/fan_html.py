@@ -6,6 +6,7 @@ import json
 from collections import Counter, defaultdict
 from html import escape
 from pathlib import Path
+from typing import Any
 
 from murmur.core.divergence import DivergenceOverlay, build_divergence_overlay, signature_label
 from murmur.core.events import Event
@@ -33,6 +34,7 @@ def render_fan_html(
     *,
     events: list[Event] | None = None,
     trace_href: str | None = "trace.html",
+    workflow_progress: dict[str, Any] | None = None,
 ) -> str:
     metrics = result.metrics
     passes = sum(1 for item in result.trajectories if item.outcome == "pass")
@@ -46,7 +48,10 @@ def render_fan_html(
         f"{escape(result.task_id)} · {escape(result.run_id)} · "
         f"n={len(result.trajectories)} · seed-driven fan"
     )
-    head = document_head(title=f"Murmur — {result.task_id}")
+    head = document_head(
+        title=f"Murmur — {result.task_id}",
+        extra_css=_workflow_progress_css() if workflow_progress else "",
+    )
     shell = hud_shell_start(
         brand="murmur",
         run_line=run_line,
@@ -94,6 +99,7 @@ def render_fan_html(
         f"{_decay_curve(result)}"
         "</div></section>"
         f"{_overlay_section(overlay, trace_href)}"
+        f"{_workflow_progress_section(workflow_progress)}"
         '<section class="cols">'
         f"{_judgment_panel(result)}"
         f"{_failure_panel(result, failure_index)}"
@@ -190,11 +196,196 @@ def write_fan_html(
     *,
     events: list[Event] | None = None,
     trace_href: str | None = "trace.html",
+    workflow_progress: dict[str, Any] | None = None,
 ) -> Path:
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render_fan_html(result, events=events, trace_href=trace_href), encoding="utf-8")
+    out.write_text(
+        render_fan_html(
+            result,
+            events=events,
+            trace_href=trace_href,
+            workflow_progress=workflow_progress,
+        ),
+        encoding="utf-8",
+    )
     return out
+
+
+def _workflow_progress_css() -> str:
+    return r"""
+.wf-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  border: var(--hud-border);
+  border-bottom: 0;
+}
+.wf-summary .kv {
+  display: block;
+  margin: 0;
+  padding: 11px 12px;
+  border-right: var(--hud-border);
+  border-bottom: var(--hud-border);
+}
+.wf-summary .kv .k,
+.wf-summary .kv span:last-child {
+  display: block;
+}
+.wf-summary .kv span:last-child {
+  margin-top: 4px;
+  word-break: break-word;
+}
+.wf-lanes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  margin: 14px 0 16px;
+}
+.wf-lane {
+  border: var(--hud-border);
+  background: var(--panel2);
+  padding: 9px 10px;
+  min-height: 68px;
+}
+.wf-lane__hd {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.wf-lane__status {
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wf-lane.is-fail .wf-lane__status,
+.wf-lane.is-contract_fail .wf-lane__status,
+.wf-lane.is-error .wf-lane__status {
+  color: var(--accent);
+}
+.wf-lane__preview {
+  margin: 7px 0 0;
+  color: var(--muted);
+  line-height: 1.35;
+  font-size: 12px;
+}
+.wf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.wf-table th,
+.wf-table td {
+  border-top: var(--hud-border);
+  padding: 7px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.wf-table th {
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.wf-table td:nth-child(1) { width: 50px; color: var(--dim); }
+.wf-table td:nth-child(2) { width: 160px; color: var(--muted); }
+.wf-table td:nth-child(3) { width: 150px; }
+.wf-table td:nth-child(4) { width: 74px; }
+.wf-status-fail,
+.wf-status-error {
+  color: var(--accent);
+}
+.wf-think {
+  margin-top: 6px;
+}
+.wf-think summary {
+  cursor: pointer;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.wf-think pre {
+  white-space: pre-wrap;
+  margin: 8px 0 0;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.42);
+  border: var(--hud-border);
+  color: var(--txt);
+}
+"""
+
+
+def _workflow_progress_section(progress: dict[str, Any] | None) -> str:
+    if not progress:
+        return ""
+    summary = dict(progress.get("summary", {}))
+    lanes = [dict(item) for item in progress.get("lanes", ()) if isinstance(item, dict)]
+    events = [dict(item) for item in progress.get("events", ()) if isinstance(item, dict)]
+    cards = "".join(
+        '<div class="kv">'
+        f'<span class="k">{escape(label)}</span>'
+        f"<span>{escape(value)}</span>"
+        "</div>"
+        for label, value in (
+            ("workflow", str(summary.get("workflow", ""))),
+            ("status", str(summary.get("status", ""))),
+            ("agents", str(summary.get("agents", 0))),
+            ("nodes", str(summary.get("nodes", 0))),
+            ("model calls", str(summary.get("model_calls", 0))),
+            ("tool calls", str(summary.get("tool_calls", 0))),
+            ("cost", f"${float(summary.get('cost_usd', 0.0)):.4f}"),
+        )
+    )
+    lane_html = "".join(
+        '<div class="wf-lane '
+        f'is-{escape(str(lane.get("status", "")))}">'
+        '<div class="wf-lane__hd">'
+        f'<span>{escape(str(lane.get("label") or lane.get("id") or "agent"))}</span>'
+        f'<span class="wf-lane__status">{escape(str(lane.get("status", "")))}</span>'
+        "</div>"
+        f'<p class="wf-lane__preview">{escape(str(lane.get("preview", "")))}</p>'
+        "</div>"
+        for lane in lanes
+    )
+    rows = "".join(_workflow_progress_row(row) for row in events)
+    return (
+        '<section class="hud-widget">'
+        '<div class="hud-widget__hd">workflow progress - agent steps + evidence</div>'
+        '<div class="hud-widget__bd">'
+        '<div class="wf-summary">'
+        f"{cards}"
+        "</div>"
+        f'<div class="wf-lanes">{lane_html}</div>'
+        '<table class="wf-table">'
+        "<thead><tr><th>seq</th><th>event</th><th>node</th><th>status</th><th>detail</th></tr></thead>"
+        f"<tbody>{rows}</tbody>"
+        "</table>"
+        "</div></section>"
+    )
+
+
+def _workflow_progress_row(row: dict[str, Any]) -> str:
+    status = str(row.get("status", ""))
+    thinking = str(row.get("thinking", ""))
+    detail = escape(str(row.get("detail", "")))
+    if thinking:
+        detail += (
+            '<details class="wf-think">'
+            "<summary>captured thinking</summary>"
+            f"<pre>{escape(thinking)}</pre>"
+            "</details>"
+        )
+    return (
+        "<tr>"
+        f"<td>{int(row.get('seq', 0) or 0)}</td>"
+        f"<td>{escape(str(row.get('type', '')))}</td>"
+        f"<td>{escape(str(row.get('node', '')))}</td>"
+        f'<td class="wf-status-{escape(status)}">{escape(status)}</td>'
+        f"<td>{detail}</td>"
+        "</tr>"
+    )
 
 
 def _metric_card(

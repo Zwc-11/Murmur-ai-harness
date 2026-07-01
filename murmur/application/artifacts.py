@@ -13,6 +13,8 @@ def build_artifact_index(run_dir: Path) -> list[dict[str, str]]:
         ("proof", "proof.json", "machine-readable proof"),
         ("proof_markdown", "proof.md", "human-readable proof"),
         ("report", "report.html", "HTML proof report"),
+        ("reliability_report", "fan.html", "workflow reliability report"),
+        ("trace_viewer", "trace.html", "workflow trace viewer"),
         ("workbench", "workbench.html", "static run workbench"),
         ("review_comment", "review_comment.md", "PR review comment"),
         ("workflow", "workflow.yaml", "workflow plan"),
