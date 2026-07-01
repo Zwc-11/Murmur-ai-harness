@@ -1,0 +1,4 @@
+[mcp_servers.langsmith]
+command = "uvx"
+args = ["langsmith-mcp-server"]
+env_vars = ["LANGSMITH_API_KEY"]
