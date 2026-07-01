@@ -1,363 +1,260 @@
-<!--
-This is the repo entrypoint for humans. It explains what Murmur is, what works
-right now, and the commands needed to install, test, and run the local demo.
--->
-
 <h1 align="center">Murmur</h1>
 
-<p align="center"><em>Proof, not vibes — a reliability harness for AI coding agents.</em></p>
+<p align="center"><strong>Open-source reliability harness for cheap coding agents.</strong></p>
 
 <p align="center">
   <a href="https://github.com/Zwc-11/Murmur-ai-harness/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Zwc-11/Murmur-ai-harness/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-blue.svg"></a>
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-blue.svg">
   <img alt="reliability: pass^k gated" src="https://img.shields.io/badge/reliability-pass%5Ek%20gated-7a3b3b">
-  <img alt="status: contract-first" src="https://img.shields.io/badge/contracts-first-2e7d32">
+  <img alt="contracts first" src="https://img.shields.io/badge/contracts-first-2e7d32">
 </p>
 
-<p align="center">
-  <img src="docs/images/workbench.png" alt="Murmur workbench — the operator map, live agent fan-out, and proof panel" width="100%">
-</p>
+Murmur makes coding-agent output measurable. It runs a task through multiple
+isolated agent attempts, checks every result against an explicit contract, and
+produces proof artifacts that show what passed, what failed, where it failed,
+and how reliable the workflow actually is. Instead of trusting one lucky run,
+Murmur shows the distribution: `pass@1`, projected and empirical `pass^k`,
+Wilson confidence intervals, failure classes, cost, latency, event logs, and
+trace spans.
 
-Murmur is a **contract and proof layer for AI-generated code changes**. It turns a
-coding task into an enforceable engineering contract, runs an agent through
-policy-controlled tools in an isolated workspace, verifies the resulting diff
-with tests and file/diff rules, and emits a PR-ready proof package.
+`pass^k` — the probability that *all* `k` repeated trials succeed — was
+introduced by Sierra's τ-bench ([arXiv:2406.12045](https://arxiv.org/abs/2406.12045))
+to measure agent reliability across repeated trials. Murmur's contribution is
+operational: contract-first validation of every attempt, stable failure-class
+stamping on every failed trajectory, and statistical CI enforcement of `pass^k`
+on coding workflows — including [gating this repo's own pull requests](#the-ci-gate-dogfooded-on-this-repo).
 
-**What it does**
+Murmur is a harness, not a model. It ships a reference patch agent
+([`murmur/adapters/agents/murmur_patch.py`](murmur/adapters/agents/murmur_patch.py))
+— a fixed reproduce → localize → read → diff → apply → test pipeline built for
+cheap models — and accepts any external agent through the same agent port
+(`AgentPort` in [`murmur/core/ports.py`](murmur/core/ports.py); the LangGraph
+adapter and the deterministic scaffold plug in the same way).
 
-- **Contract-first** — you declare what success means and what it's allowed to cost; the harness fails closed if the diff violates the contract.
-- **Reliability as a distribution** — runs an agent `N` times and reports `pass@1`, projected and empirical `pass^k`, Wilson CIs, variance, cost, and latency instead of a single lucky pass.
-- **Policy-controlled tools** — typed `list_files` / `search` / `read_file` / `apply_patch` / `run_test` / `git_diff` / `finish`; secrets, destructive shell, network, and unknown edit paths are denied by default.
-- **Proof, not vibes** — every run emits `contract.yaml`, `events.jsonl`, `diff.patch`, `proof.md`, and a `report.html` you can hand to a reviewer.
-- **Statistical CI gate** — blocks a PR only on a *statistically real* `pass^k` regression (paired-delta bootstrap), never on a raw dip.
-- **Self-writing workflows (Flock)** — a planner compiles a task into a typed, schema-validated DAG and fans out cheap, isolated subagents with tournaments and adversarial verification.
+## What Murmur does
 
-The architecture is Python-first. The core is hexagonal: the domain owns
-contracts, events, replay, metrics, and run orchestration; models, agents,
-storage, tracing, judges, and reports plug in through ports.
-
-## Quickstart: the workbench
-
-Run the prompt-to-artifact workbench locally in a few minutes.
-
-```bash
-git clone <your-fork-url> murmur && cd murmur
-python3 -m venv .venv && . .venv/bin/activate        # Windows: .venv\Scripts\activate
-python -m pip install -e ".[dev]"                    # model SDKs ship by default
-cp .env.example .env                                 # then add DEEPSEEK_API_KEY
-murmur serve                                          # builds + serves the workbench
-```
-
-`murmur serve` prints a URL (default <http://127.0.0.1:8765/agent-map.html>). Open it,
-type a natural-language goal (a website, a program, an essay, or a fix-test), tick
-**Use model**, and click **Run agents**. The result panel shows the validated artifact
-(website preview, program, or document), the trust score, and every gate.
-
-Without an API key the workbench still runs in deterministic offline mode (leave
-**Use model** unchecked). With `deepseek-v4-pro`, planning is model-authored and the
-model designs the workflow from your task. Reasoning/thinking is on by default;
-`DEEPSEEK_MIN_OUTPUT_TOKENS` and `DEEPSEEK_MAX_ESCALATION_TOKENS` tune the safety
-budget that prevents reasoning-starvation, and `DEEPSEEK_THINKING=disabled` turns
-thinking off.
+- **Runs agent fan-out**: executes `N` independent attempts for the same task.
+- **Checks contracts first**: verifies task-specific requirements before
+  trusting any artifact.
+- **Reports the distribution**: `pass@1`, projected and empirical `pass^k`,
+  Wilson 95% intervals, variance, cost, and latency.
+- **Explains failures**: stamps failed trajectories with stable failure
+  classes, diagnostic IDs, and evidence.
+- **Records traces**: writes `gen_ai.*`-style spans and Murmur-specific
+  attributes for every workflow step, with exact replay verification against
+  the event log.
+- **Gates CI on statistics, not noise**: the gate compares per-task `pass^k`
+  against a stored baseline with a seeded paired-delta bootstrap (10,000
+  resamples, 95% percentile CI) and blocks only when the entire CI is below
+  zero. This is a standard nonparametric bootstrap test, not a threshold
+  heuristic; an identical-input rerun always yields the identical verdict.
+- **Works offline**: the deterministic scaffold runs the whole loop — fan-out,
+  contracts, reports, traces, replay, gate — with no API keys. (Verified by
+  running everything below with the `.env` file removed.)
 
 ## What it looks like
 
-Everything renders as standalone HUD pages — no server, no build step.
+Every image in this README is an unedited headless-browser screenshot (Edge
+`--headless=new --screenshot`) of Murmur's own generated HTML, captured
+2026-07-01. The two below render the
+[committed synthetic artifacts](docs/benchmarks/2026-07-01-synthetic/).
 
-| Reliability report | Trace viewer |
+| Reliability fan report | Trace viewer |
 | --- | --- |
-| [![Reliability fan report](docs/images/fan-report.png)](docs/images/fan-report.png) | [![Trace viewer](docs/images/trace-viewer.png)](docs/images/trace-viewer.png) |
-| `pass@1` · projected-vs-empirical `pass^k` decay · divergence overlay | `gen_ai.*` span waterfall · inspector · replay-verified |
+| [![Reliability fan report: pass@1 0.80 with Wilson CI, projected vs empirical pass^k decay, divergence overlay](docs/images/fan-report.png)](docs/images/fan-report.png) | [![Trace viewer: 30 trajectories, span waterfall with replay badges, span inspector](docs/images/trace-viewer.png)](docs/images/trace-viewer.png) |
+| [synthetic/deterministic] `murmur run --n 30 --success-rate 0.7 --error-rate 0.1 --seed 7` → [fan.html](docs/benchmarks/2026-07-01-synthetic/fan.html) | [synthetic/deterministic] `murmur trace --n 30 --seed 7 --replay` (replay verified 30/30) → [trace.html](docs/benchmarks/2026-07-01-synthetic/trace.html) |
 
-The local workbench (`murmur serve`) is a HUD that turns a natural-language goal into a
-draggable operator map, fans agents out live, and shows the validated artifact, trust
-score, and every gate — the screenshot at the top is a live `deepseek-v4-pro` run.
+[![Workbench operator map in offline preview mode](docs/images/workbench-operator-map.png)](docs/images/workbench-operator-map.png)
 
-## Current slice
+*[bundled demo data] The local workbench (`murmur serve`) in offline preview
+mode — the operator map before a run is launched. Screenshot of
+`murmur agent-map-preview` output.*
 
-It also now includes **Flock** (`murmur.flock`), the self-writing multi-agent
-engine: a planner compiles a task into a typed, schema-validated workflow DAG and
-an async executor runs it by fanning out cheap, isolated subagents — fan-out,
-tournaments, and adversarial verification by default. Try `murmur flock run`
-(offline, no keys) and see [docs/flock.md](docs/flock.md).
+## Results
 
-This repo now includes the contract-first MVP plus the earlier reliability,
-trace, judgment, and CI-gate machinery from [docs/architecture.md](docs/architecture.md):
+> **All numbers in the synthetic table below are from the deterministic
+> synthetic suite (no API keys, no model).** They demonstrate the harness
+> machinery, not any model's ability. Real-model benchmark:
+> [docs/benchmarks/2026-07-01-deepseek/](docs/benchmarks/2026-07-01-deepseek/)
+> — reproduce it with the [runbook](docs/benchmarks/RUNBOOK.md).
 
-- Contract-first `fix-test` execution: reproduce a failing command, compile a
-  typed YAML contract, run a policy-controlled agent, verify the diff, and write
-  `contract.yaml`, `events.jsonl`, `diff.patch`, `proof.md`, `report.html`, and
-  `summary.json` under `.murmur/runs/<run_id>/`.
-- Contract utility commands: `murmur contract create`, `murmur contract check`,
-  and `murmur run-contract`.
-- Policy-controlled typed tools: `list_files`, `search`, `read_file`,
-  `apply_patch`, `run_test`, `git_diff`, and `finish`; `.env`, secrets,
-  destructive shell, network/dependency installs, pushes, and unknown edit paths
-  are denied by default.
-- Pure core domain types and ports.
-- Append-only JSONL and in-memory event stores.
-- Tool gateway with record and replay modes.
-- Fake agent adapter for deterministic local demos.
-- Stochastic flaky agent so the harness has a real distribution to measure.
-- Concurrent `N`-trajectory fan-out in the run conductor.
-- Distribution-aware metrics: `pass@1` with Wilson CI, projected `pass^k`,
-  empirical unbiased `pass^k`, variance, cost, p50/p95 latency, and failure
-  breakdown.
-- Event-log-derived results: metrics, fan, divergence overlay, judgment, and
-  diagnosis are projected from recorded events.
-- Agreement/divergence analysis: step-index alignment, per-step agreement, first
-  divergence detection, and overlay cell states (`converged`, `diverged`,
-  `failed`, `inactive`).
-- Cost-aware judgment cascade: deterministic Tier 0, convergence Tier 1, Tier 2
-  only for unknown/minority trajectories, cached judge-call helper, escalation
-  trace, and cost-ratio measurement harness.
-- Diagnosis: step-boundary schema checks, deterministic-first failure taxonomy,
-  trace stamping with `murmur.failure.class` / `murmur.failure.step`, and
-  validation metrics for injected failures.
-- Structured contract diagnostics: acceptance checks can now emit stable
-  predicate IDs, evidence, and neutral repair hints while preserving the simple
-  boolean `task.accepts()` path.
-- Public SDK trace importers: OpenAI Agents SDK-style traces, Claude Code-style
-  transcripts/hooks, Google ADK-style traces, and LangGraph event streams can be
-  normalized into the same Murmur event log.
-- Trajectory-fan visualizer: a terminal view and a standalone HTML/SVG report
-  with reliability cards, decay curve, divergence overlay, judgment, and
-  diagnosis.
-- Statistical CI gate: a baseline store, a paired-delta bootstrap regression test
-  (`regressed` / `improved` / `inconclusive`, seeded and deterministic), a
-  per-failure-class PR comment, and a composite GitHub Action wrapping it —
-  [demonstrated blocking a real regression on PR #2](https://github.com/Zwc-11/Murmur-ai-harness/pull/2).
-- Benchmark seam: a `load_suite` / `Scaffold` interface with two loaders — the
-  deterministic synthetic suite, and a real **SWE-bench Verified** loader that maps
-  instances to `TaskSpec`s (problem statement → prompt; `FAIL_TO_PASS` /
-  `PASS_TO_PASS` test contract → metadata) over a deterministic subset.
-- Real SWE-bench evaluation along **two paths**, both holding the model fixed and
-  varying only the scaffold (`single-shot` vs `self-repair`):
-  - **Integrated** — `SwePatchAgent` implements the existing `AgentPort` and
-    `SweBenchJudge` implements `JudgePort`; the conductor's judge is injectable, so
-    a real run flows through the harness and inherits tracing, replay, divergence,
-    and per-step diagnosis (`murmur gate --suite swe-bench-verified --real-agent`).
-    Per-trajectory Docker eval — right for small/debug N.
-  - **Batch** — `murmur bench` evaluates all patches in one parallel harness run for
-    the headline number at scale (faster, but not traced).
-  Both fold resolved/not into the same `SuiteResult` + `pass^k` machinery the gate
-  uses. The wiring is complete and tested with fakes; the numbers need
-  `ANTHROPIC_API_KEY` + Docker (see below).
-- CLI commands to record/replay a dummy run, fan out a stochastic run, render
-  trace/fan HTML artifacts, initialize a project (`murmur init`), inspect agent
-  adapter capabilities (`murmur agents list`), gate a candidate against a
-  baseline, and run the SWE-bench harness-only comparison.
-- Tests proving replay, event-log projection, metric math, divergence detection,
-  judgment gating, judge caching, failure classification, the three gate verdicts,
-  seed reproducibility, structured diagnostics, external trace import, and the
-  OSS adoption CLI surface.
+**[synthetic/deterministic]** — seeded scaffold, task `hard.landing_site`,
+N=30, seed 7 ([artifacts](docs/benchmarks/2026-07-01-synthetic/)):
 
-## Launch status
+| Metric | Value |
+| --- | --- |
+| pass@1 | 0.80 (Wilson 95% [0.63, 0.90], 24/30 pass) |
+| pass^30 projected (i.i.d.) | 0.0012 |
+| pass^30 empirical (unbiased) | 0.0000 |
+| Replay | 30/30 trajectories reproduced exactly from the event log |
 
-Implemented and locally validated:
+**[real-model]** — `deepseek-v4-pro` (reasoning high, thinking enabled), task
+`hard.landing_site`, n=10, k=3, run 2026-07-01 in 34.4 minutes
+([events.jsonl](docs/benchmarks/2026-07-01-deepseek/events.jsonl) ·
+[fan.html](docs/benchmarks/2026-07-01-deepseek/fan.html) ·
+[summary.json](docs/benchmarks/2026-07-01-deepseek/summary.json) ·
+[details](docs/benchmarks/2026-07-01-deepseek/README.md)):
 
-- `pytest -q`
-- `ruff check murmur tests`
-- Free synthetic reliability and regression-gate demos.
-- Offline SWE-bench harness wiring with fake models/evaluators.
-- Public trace importers for observational integration demos.
+| Metric | Value |
+| --- | --- |
+| pass@1 | 0.80 (8/10 pass, Wilson 95% [0.49, 0.94]) |
+| pass^3 empirical (unbiased) | 0.467 |
+| pass^3 projected (i.i.d.) | 0.512 |
+| Cost (recorded tokens × DeepSeek list price) | $0.87 total (38 calls, 266k in / 207k out tokens) |
+| Latency per attempt | median 214 s, max 291 s |
 
-Not yet publicly validated:
+Both failures were full HTML/CSS artifacts that omitted the contract's
+required `pass^k` notation (`missing_metric_pass_hat_k`) — the near-miss case
+the contract check exists to catch. Single-day, single-task, single-model
+sample at n=10; the Wilson interval is wide by design honesty, not by
+accident.
 
-- A paid SWE/Terminal-style benchmark result with a real frontier model and
-  Docker evaluator. Murmur deliberately exits instead of printing a placeholder
-  number when those dependencies are absent.
+[![Real-model reliability fan report for the DeepSeek run](docs/images/fan-report-real-model.png)](docs/images/fan-report-real-model.png)
 
-Start with [docs/quickstart.md](docs/quickstart.md). For CI wiring, see
-[docs/github-action.md](docs/github-action.md).
+*[real-model] Headless-browser screenshot of
+[the committed fan.html](docs/benchmarks/2026-07-01-deepseek/fan.html) from
+this run (the report's headline pass^k card uses k=n=10; the k=3 numbers above
+come from summary.json).*
 
-## Environment
+## The CI gate, dogfooded on this repo
 
-Use Python 3.12 or newer.
+[`.github/workflows/murmur-gate.yml`](.github/workflows/murmur-gate.yml) runs
+the synthetic suite on every PR to this repo, posts the verdict as a PR
+comment, and fails the check **only on a statistically real regression**. The
+test, in [`murmur/core/regression.py`](murmur/core/regression.py): baseline and
+candidate run the same tasks under the same seeds, per-task `pass^k` deltas are
+paired, and a seeded bootstrap (10,000 resamples) puts a 95% percentile CI on
+the mean delta. Whole CI below zero → block; above → improved; straddling →
+inconclusive, never blocked.
+
+All three verdicts, reproduced locally on 2026-07-01 with no API keys (exact
+commands in the [artifact README](docs/benchmarks/2026-07-01-synthetic/README.md)):
+
+| Run | Verdict | Exit |
+| --- | --- | --- |
+| First run, seed 7 | [BASELINE SET — pass^5 0.20 over 12 tasks](docs/benchmarks/2026-07-01-synthetic/gate-1-baseline.md) | 0 |
+| Same scaffold, seed 8 | [INCONCLUSIVE — Δ −0.01, CI −0.08 to +0.05](docs/benchmarks/2026-07-01-synthetic/gate-2-inconclusive.md) | 0 (does not block) |
+| Degraded scaffold (−0.12) | [REGRESSED — Δ −0.09, CI −0.14 to −0.05](docs/benchmarks/2026-07-01-synthetic/gate-3-regressed.md) | 1 (blocks) |
+
+## Quickstart
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
+git clone https://github.com/Zwc-11/Murmur-ai-harness.git
+cd Murmur-ai-harness
+python -m venv .venv
+. .venv/bin/activate        # Windows: .venv\Scripts\activate
 python -m pip install -e ".[dev]"
-```
-
-Run the checks:
-
-```bash
 pytest
-ruff check murmur tests
 ```
 
-Run the contract-first MVP on a failing test:
+Run the local workbench:
 
 ```bash
+murmur serve
+```
+
+Open the printed URL, enter a goal, and run the agents. Without an API key,
+leave **Use model** unchecked for the deterministic offline mode.
+
+## Common commands
+
+Every command below was exercised offline (no API keys) on 2026-07-01; the
+fix/test workflow ran against a scratch repo containing the failing checkout
+test.
+
+```bash
+# Reliability fan-out on any task under tasks/ (or demo | hard)
+murmur run --n 30 --success-rate 0.7 --error-rate 0.1 --seed 7
+murmur run --task status_page --n 30 --seed 7
+
+# Trace viewer with replay verification
+murmur trace --n 30 --seed 7 --replay
+
+# Statistical reliability gate against a stored baseline
+murmur gate --suite synthetic --n 30 --k 5 --seed 7 --branch main
+murmur gate --suite synthetic --n 30 --k 5 --scaffold worse --success-delta -0.12
+
+# Contract-first fix/test workflow, run inside a repo with a failing test
+# (--agent scripted is offline; --agent murmur uses the reference patch agent)
 murmur fix-test --cmd "python -m pytest tests/test_checkout.py -q" --budget 0.50
 ```
 
-This creates `.murmur/runs/<run_id>/contract.yaml`, `events.jsonl`,
-`diff.patch`, `proof.md`, `report.html`, and `summary.json`. The command fails
-closed if the failure cannot be reproduced or the final diff violates the
-contract.
+## Tasks
 
-Run the Phase 0 record/replay demo:
+[`tasks/`](tasks/) contains six runnable task specs: `demo` (echo smoke test),
+`hard` (landing site with the structured `hard_website_v1` acceptance
+contract), `status_page` (same contract family, different brief), and three
+exact-match contract specs (`bugfix_offby_one`, `api_client_retry`,
+`docgen_gate_verdicts`). Each loads and runs offline via
+`murmur run --task <name>`; the exact-match specs are written for real models —
+the deterministic scaffold cannot solve them, so offline runs show the contract
+rejecting every attempt, which is the intended demonstration.
 
-```bash
-murmur demo --n 3 --event-log .murmur/demo.jsonl
-murmur replay --event-log .murmur/demo.jsonl
-murmur replay --event-log .murmur/demo.jsonl --mutate
-```
+## Reliability features for cheap reasoning models
 
-The `--mutate` replay intentionally changes the task prompt and should fail with
-a replay divergence. That is the first proof that Murmur can detect when a
-trajectory stops matching the recorded path.
+DeepSeek reasoner-class models can spend the whole token budget on hidden
+reasoning and return no final content ("reasoning starvation"). Murmur's
+DeepSeek adapter ([`murmur/benchmarks/swe/model.py`](murmur/benchmarks/swe/model.py))
+guarantees a minimum output budget per call and, when a call comes back
+starved, retries with a doubled budget up to a cap before surfacing a hard
+error — tuned by `DEEPSEEK_MIN_OUTPUT_TOKENS` and
+`DEEPSEEK_MAX_ESCALATION_TOKENS` in [.env.example](.env.example).
 
-Run the Phase 2-4 reliability fan-out:
+## Output artifacts
 
-```bash
-murmur run --n 30 --success-rate 0.7 --error-rate 0.1 --seed 7
-```
+Murmur writes proof files under `.murmur/`:
 
-This fans out a flaky agent `N` times and prints the distribution. The point is
-the gap between `pass@1`, projected `pass^k`, and the empirical unbiased
-`pass^k` curve. A one-shot `pass@1` eval cannot see that gap; Murmur can.
+- `events.jsonl`: append-only event log (the source of truth)
+- `proof.json` / `proof.md` / `report.html`: machine- and reviewer-facing proof
+- `fan.html`: reliability report
+- `trace.html`: span waterfall and inspector
+- `gate.md`: the PR comment the CI gate posts
+- contract files and generated artifacts (sites, patches, program outputs)
 
-```text
-pass@1            0.80    Wilson95 [0.63, 0.90]
-pass^k projected  0.0012  (i.i.d. k=30)
-pass^k empirical  0.0000  (unbiased; 24/30 pass)
-```
+## Architecture
 
-The run is reproducible per `--seed`. It also writes a standalone
-`.murmur/fan.html` report you can open in a browser (no server, no build step):
-reliability cards, the projected-vs-empirical `pass^k` decay curve, the
-divergence overlay (the flaky agent shares a fixed opening plan, so the lanes
-stay *converged* until the seed-driven split — divergence at step 4 — making the
-overlay locate exactly where runs stop agreeing), the judgment cascade cost
-panel, and the failure-diagnosis breakdown.
+Python-first, ports-and-adapters. The core owns contracts, events, replay,
+metrics, and orchestration; models, tools, judges, storage, tracing, reports,
+and agents plug in through ports. The bundled agents are the reference patch
+agent (`murmur`), a contract-lite JSON-action agent, the deterministic
+scaffold, and a LangGraph adapter — anything implementing `AgentPort` drops in
+the same way.
 
-Render the Phase 1 trace viewer (`gen_ai.*` span waterfall + inspector) and
-verify replay:
+See [docs/architecture.md](docs/architecture.md) for the full design, and
+[docs/dev/](docs/dev/) for the original design plans and review notes.
 
-```bash
-murmur trace --n 30 --seed 7 --replay
-```
+## Status
 
-`--replay` re-executes every recorded trajectory through the replay gateway and
-confirms each reproduces exactly, marking the spans `murmur.replay=true`.
+Implemented and verified locally (commands above, artifacts committed):
 
-Export the trace to LangSmith and close the MCP self-debug loop (Phase 6):
+- deterministic offline demos, fan reports, trace viewer, replay verification
+- contract-first fix/test flow with the reference patch agent
+- statistical regression gate + GitHub Action wrapper (dogfooded on this repo)
+- local workbench
+- public trace importers
+- SWE-bench adapter wiring with fake-model tests
 
-```bash
-pip install -e ".[otel]"
-export LANGSMITH_API_KEY=ls-...
-murmur trace --n 12 --seed 7 --otlp --backend langsmith --project murmur
-```
+Not claimed:
 
-The same `gen_ai.*` spans the local viewer renders are exported over OTLP to
-LangSmith (content capture stays off by default). The repo ships a
-[`.mcp.json`](.mcp.json) wiring the official LangSmith MCP server, so a coding agent
-can pull the run's trace back and debug Murmur from it — the "write → trace → debug"
-loop closed on Murmur itself. Full runbook:
-[docs/LANGSMITH_MCP_LOOP.md](docs/LANGSMITH_MCP_LOOP.md). The exporter, CLI, and
-`.mcp.json` are in the repo and tested; the live export + MCP debugging need a
-LangSmith account (documented, never faked).
+- a SWE-bench headline number. The wiring exists behind a real-model + Docker
+  requirement, and Murmur intentionally refuses to print benchmark-like numbers
+  unless the real model and evaluator actually ran.
+- production hardening. This is a working prototype built and validated by one
+  person; interfaces may change.
 
-Gate CI on a *statistical* regression (Phase 5):
+## Documentation
 
-```bash
-murmur gate --branch main --n 20 --update-baseline                 # records the baseline
-murmur gate --branch main --n 20 --scaffold worse --success-delta -0.12   # a candidate
-```
-
-The gate runs a task suite, compares the candidate against the stored baseline on
-the same tasks/N/seed, and bootstraps a 95% CI on the per-task `pass^k` delta. It
-emits one of three verdicts and exits non-zero **only** on `regressed`:
-
-```text
-## Murmur reliability gate — REGRESSED ❌
-pass^5: 0.21 -> 0.07   (Δ -0.14, 95% CI [-0.21, -0.07])   <- below 0
-New failures by class (candidate vs baseline):
-  +16  contract_violation
-  +15  tool_error
-```
-
-`improved` (CI entirely above 0) and `inconclusive` (CI straddles 0 — "widen N")
-do not block. Blocking only on a statistically real regression — never on a raw
-dip — is what keeps the gate from crying wolf and getting disabled. The bootstrap
-is seeded, so the verdict is stable. The composite GitHub Action in
-[murmur/ci/action.yml](murmur/ci/action.yml) wraps this command, posts the report
-as a PR comment, and sets the check status.
-
-Load the real SWE-bench Verified task set behind the same seam:
-
-```bash
-# from a local dump of princeton-nlp/SWE-bench_Verified, or `pip install datasets`
-MURMUR_SWEBENCH_PATH=swebench_verified.jsonl \
-  murmur gate --suite swe-bench-verified --n 5
-```
-
-The loader maps each instance to a `TaskSpec` (problem statement → prompt, the
-`FAIL_TO_PASS` / `PASS_TO_PASS` tests → an acceptance contract in metadata) over a
-deterministic subset. The gate deliberately **refuses** to run these through the
-built-in stochastic scaffold — that would emit a `pass^k` that *looks* like a
-benchmark result and isn't. The old `murmur bench` patch-only path is deprecated;
-use `murmur fix-test` or `murmur run-contract` for public proof runs.
-
-Legacy SWE-bench harness-only comparison (internal evaluator seam):
-
-```bash
-# Deprecated public path; retained only for internal/legacy evaluator work.
-pip install -e '.[bench]'          # anthropic + datasets + swebench (needs Docker)
-export ANTHROPIC_API_KEY=sk-ant-…  # one model, held fixed across scaffolds
-murmur bench --subset 100 --n 10 --k 5 \
-  --scaffold-a single-shot --scaffold-b self-repair
-```
-
-This holds one model fixed and varies **only the scaffold**: scaffold A is a
-single model call, scaffold B adds one self-review/repair turn — the only
-difference, so the `pass^k` delta is attributable to the harness. Each attempt's
-patch is evaluated by the official SWE-bench Docker harness; resolved/not folds
-into the same `SuiteResult` + `pass^k` + paired-delta machinery the gate uses, and
-the report states the claim from measured numbers:
-
-```text
-scaffold A  single-shot   pass@1 0.31  Wilson95 [0.23, 0.41]  pass^5 0.18
-scaffold B  self-repair   pass@1 0.39  Wilson95 [0.30, 0.49]  pass^5 0.27
-verdict     IMPROVED  (Δpass^5 +0.09, 95% CI [+0.02, +0.16])
-```
-
-Or run the **integrated** path, which routes a real SWE-bench run through the
-conductor so it inherits tracing, replay, and per-step diagnosis (per-trajectory
-Docker eval; use a small N):
-
-```bash
-murmur gate --suite swe-bench-verified --real-agent --scaffold self-repair --n 5
-```
-
-*(Illustrative layout — the figures above are not a measured result.)* The harness
-**refuses to print a number unless a real model and Docker evaluation actually
-ran**; without them it exits with an actionable error rather than a placeholder.
-
-> **The harness is built; the measured number is the one remaining paid step.**
-> The wiring — model adapter (prompt-cached), the two scaffolds, the SWE-bench
-> evaluator, the runner, and the report — is complete and unit-tested with fakes
-> (no API, no Docker). What's left is *running* it: a frontier model plus the
-> SWE-bench Docker harness over a subset, which costs real money and compute (on
-> the order of $1–2k for a defensible 100-instance subset). Until that run
-> happens, the résumé line stops at "gates CI on statistical regression" — the one
-> locked rule is **the number is real or absent**.
-
-## GitHub
-
-This checkout is configured for:
-
-```bash
-murmur https://github.com/Zwc-11/Murmur-ai-harness.git
-```
+- [Quickstart](docs/quickstart.md)
+- [Architecture](docs/architecture.md)
+- [Real-model benchmark runbook](docs/benchmarks/RUNBOOK.md)
+- [GitHub Action](docs/github-action.md)
+- [Flock workflow engine](docs/flock.md)
+- [LangSmith MCP loop](docs/LANGSMITH_MCP_LOOP.md)
+- [Design notes and plans](docs/dev/)
 
 ## Author
 
 Built and maintained by **Caesar Zhou Wei Chen** ([@Zwc-11](https://github.com/Zwc-11)).
+
 Released under the [MIT License](LICENSE).
