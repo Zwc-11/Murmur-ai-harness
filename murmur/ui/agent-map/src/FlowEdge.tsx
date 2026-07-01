@@ -5,6 +5,7 @@ import { useReducedMotion } from "./hooks/useReducedMotion";
 import type { MapEdgeData } from "./types";
 
 const TRAVERSE_TIME = 2;
+const IDLE_TRAVERSE_TIME = 8;
 const MAX_DUR = 20;
 const MAX_PARTICLES = 5;
 const MAX_PARTICLES_LOW_FX = 2;
@@ -61,14 +62,19 @@ export const FlowEdge = memo(function FlowEdge({
   let traversalDuration = TRAVERSE_TIME;
   const particleCap = lowFx ? MAX_PARTICLES_LOW_FX : MAX_PARTICLES;
 
-  if (active && cps > 0 && !reducedMotion) {
-    const interArrival = 1 / cps;
-    if (interArrival > TRAVERSE_TIME) {
+  if (!reducedMotion) {
+    if (active && cps > 0) {
+      const interArrival = 1 / cps;
+      if (interArrival > TRAVERSE_TIME) {
+        particleCount = 1;
+        traversalDuration = Math.min(interArrival, MAX_DUR);
+      } else {
+        traversalDuration = TRAVERSE_TIME;
+        particleCount = Math.min(particleCap, Math.max(2, Math.round(cps * TRAVERSE_TIME)));
+      }
+    } else if (!lowFx) {
       particleCount = 1;
-      traversalDuration = Math.min(interArrival, MAX_DUR);
-    } else {
-      traversalDuration = TRAVERSE_TIME;
-      particleCount = Math.min(particleCap, Math.max(2, Math.round(cps * TRAVERSE_TIME)));
+      traversalDuration = IDLE_TRAVERSE_TIME + simpleHash(`${id}:idle`) * 3;
     }
   }
 
@@ -80,12 +86,20 @@ export const FlowEdge = memo(function FlowEdge({
   const pathId = `path-${safeId}`;
   const gradientId = `grad-${safeId}`;
 
-  const bodyOpacity = active ? 0.78 + intensity * 0.2 : 0.22;
-  const glowOpacity = active ? (lowFx ? 0.28 + intensity * 0.15 : 0.35 + intensity * 0.25) : 0.08;
-  const showDash = active && !reducedMotion && !lowFx;
+  const bodyOpacity = active ? 0.78 + intensity * 0.2 : 0.42;
+  const glowOpacity = active ? (lowFx ? 0.28 + intensity * 0.15 : 0.35 + intensity * 0.25) : 0.18;
+  const showDash = !reducedMotion && !lowFx;
+  const packetOpacity = active ? (lowFx ? 0.55 : 0.78) : 0.36;
+  const packetScale = active ? 1 : 0.72;
 
   return (
-    <g className={`am-pipeline-edge ${active ? "am-pipeline-edge--hot" : "am-pipeline-edge--idle"}`}>
+    <g
+      className={[
+        "am-pipeline-edge",
+        `am-pipeline-edge--${edgeData.kind ?? "flow"}`,
+        active ? "am-pipeline-edge--hot" : "am-pipeline-edge--idle",
+      ].join(" ")}
+    >
       <defs>
         <linearGradient
           id={gradientId}
@@ -104,15 +118,23 @@ export const FlowEdge = memo(function FlowEdge({
         d={edgePath}
         fill="none"
         stroke={`url(#${gradientId})`}
-        strokeWidth={sw * 2.4 + (lowFx ? 4 : 8)}
-        strokeOpacity={glowOpacity}
+        strokeWidth={sw * 4 + (lowFx ? 5 : 11)}
+        strokeOpacity={glowOpacity * 0.8}
+        strokeLinecap="round"
+      />
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="#0f172a"
+        strokeWidth={sw * 2.05 + 5}
+        strokeOpacity={active ? 0.24 : 0.12}
         strokeLinecap="round"
       />
       <path
         d={edgePath}
         fill="none"
         stroke={`url(#${gradientId})`}
-        strokeWidth={sw + 2}
+        strokeWidth={sw + 5}
         strokeOpacity={bodyOpacity}
         strokeLinecap="round"
       />
@@ -130,23 +152,23 @@ export const FlowEdge = memo(function FlowEdge({
           d={edgePath}
           fill="none"
           stroke="#ffffff"
-          strokeWidth={sw * 0.4}
-          strokeOpacity={0.9}
-          strokeDasharray="5 18"
+          strokeWidth={active ? sw * 0.45 : Math.max(1.5, sw * 0.32)}
+          strokeOpacity={active ? 0.88 : 0.5}
+          strokeDasharray={active ? "6 18" : "3 24"}
           strokeLinecap="round"
-          className="am-pipeline-dash"
+          className={active ? "am-pipeline-dash" : "am-pipeline-dash am-pipeline-dash--idle"}
         />
       ) : null}
 
-      {active &&
+      {particleCount > 0 &&
         !reducedMotion &&
         Array.from({ length: particleCount }).map((_, idx) => (
           <g key={idx}>
             <ellipse
-              rx={particleRadius * (lowFx ? 1.6 : 2.2)}
-              ry={particleRadius * 0.85}
+              rx={particleRadius * packetScale * (lowFx ? 1.6 : 2.2)}
+              ry={particleRadius * packetScale * 0.85}
               fill={sourceGlow}
-              opacity={lowFx ? 0.55 : 0.75}
+              opacity={packetOpacity}
             >
               <animateMotion
                 dur={`${traversalDuration}s`}
@@ -157,7 +179,13 @@ export const FlowEdge = memo(function FlowEdge({
                 <mpath href={`#${pathId}`} />
               </animateMotion>
             </ellipse>
-            <circle r={particleRadius * 0.65} fill="#ffffff" stroke={sourceColor} strokeWidth={1.5}>
+            <circle
+              r={particleRadius * packetScale * 0.65}
+              fill="#ffffff"
+              stroke={sourceColor}
+              strokeWidth={active ? 1.5 : 1}
+              opacity={active ? 1 : 0.76}
+            >
               <animateMotion
                 dur={`${traversalDuration}s`}
                 repeatCount="indefinite"

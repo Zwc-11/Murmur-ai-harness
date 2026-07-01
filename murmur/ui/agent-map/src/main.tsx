@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AgentMapApp } from "./AgentMapApp";
 import "./agent-map.css";
+import "./pipeline.css";
 
 declare global {
   interface Window {
