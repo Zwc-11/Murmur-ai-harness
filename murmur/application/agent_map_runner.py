@@ -29,6 +29,7 @@ from murmur.application.workflow_runtime import WorkflowRunResult, WorkflowRunti
 from murmur.domain.proof import ProofPackage
 from murmur.domain.workflow import WorkflowPlan
 from murmur.report.agent_map_projector import project_agent_map
+from murmur.report.workflow_observability import write_workflow_observability_reports
 
 SITE_MAX_PASSES = 4
 SITE_GEN_MAX_TOKENS = 24000
@@ -146,6 +147,8 @@ def _run_generic_map(
             artifact_build=artifact_build,
         )
     result = _refresh_workflow_proof(result, artifact_build)
+    _persist_planner_provenance(result.run_dir, planner_meta, {})
+    _write_observability_reports(result.run_dir, out_root)
     artifact_index = write_artifact_index(result.run_dir)
     run_meta = _run_metadata(
         run_dir=result.run_dir,
@@ -232,6 +235,8 @@ def _run_fix_test_map(
         json.dumps(live_result, indent=2, default=str),
         encoding="utf-8",
     )
+    _persist_planner_provenance(run_dir, planner_meta, {})
+    _write_observability_reports(run_dir, out_root)
     artifact_index = write_artifact_index(run_dir)
     run_meta = _run_metadata(
         run_dir=run_dir,
@@ -265,6 +270,11 @@ def _build_model(options: AgentMapRunOptions) -> Any | None:
         provider=options.provider or None,
         model=options.model or default_model(options.provider),
     )
+
+
+def _write_observability_reports(run_dir: Path, out_root: Path) -> None:
+    mirror = out_root.parent if out_root.name == "runs" else None
+    write_workflow_observability_reports(run_dir, mirror_dir=mirror)
 
 
 def _live_result_from_workflow_run(
@@ -1215,9 +1225,10 @@ def _persist_planner_provenance(
         preview["planner"] = planner_meta
     _merge_planner_into_proof(run_dir / "proof.json", planner_meta)
     update_json_file(run_dir / "run_result.json", {"planner": planner_meta})
-    if (run_dir / "events.jsonl").is_file():
+    events_path = run_dir / "events.jsonl"
+    if events_path.is_file() and not _planner_event_recorded(events_path):
         append_run_event(
-            run_dir / "events.jsonl",
+            events_path,
             run_dir.name,
             "workflow_planned",
             {"planner": planner_meta},
@@ -1230,17 +1241,33 @@ def _merge_planner_into_proof(path: Path, planner_meta: dict[str, Any]) -> None:
     if not path.is_file():
         return
     proof = json.loads(path.read_text(encoding="utf-8"))
+    already_merged = proof.get("planner") == planner_meta
     proof["planner"] = planner_meta
     budget = dict(proof.get("budget", {}))
-    budget["model_calls"] = int(budget.get("model_calls", 0)) + int(
-        planner_meta.get("model_calls", 0)
-    )
-    budget["cost_usd"] = round(
-        float(budget.get("cost_usd", 0.0)) + float(planner_meta.get("cost_usd", 0.0)), 6
-    )
+    if not already_merged:
+        budget["model_calls"] = int(budget.get("model_calls", 0)) + int(
+            planner_meta.get("model_calls", 0)
+        )
+        budget["cost_usd"] = round(
+            float(budget.get("cost_usd", 0.0)) + float(planner_meta.get("cost_usd", 0.0)),
+            6,
+        )
     budget["planning_ms"] = round(float(planner_meta.get("duration_ms", 0.0)), 1)
     proof["budget"] = budget
     path.write_text(json.dumps(proof, indent=2, default=str), encoding="utf-8")
+
+
+def _planner_event_recorded(events_path: Path) -> bool:
+    for line in events_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if row.get("type") == "workflow_planned":
+            return True
+    return False
 
 
 def _timeline_from_events(events_path: Path, planner_meta: dict[str, Any]) -> list[dict[str, Any]]:

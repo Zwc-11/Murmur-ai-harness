@@ -722,7 +722,11 @@ def build_site_artifact(
             run_id,
             tool="write_site_artifact",
             ok=True,
-            result={"path": "site/index.html", "bytes": site_path.stat().st_size},
+            result={
+                "path": "site/index.html",
+                "bytes": site_path.stat().st_size,
+                "candidate_index": candidate_index,
+            },
             latency_ms=_elapsed(start),
         )
         validation = validate_site_artifact(

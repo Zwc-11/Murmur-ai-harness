@@ -257,6 +257,7 @@ const TRACES = {data_json};
 const RUN = {json.dumps(run_label)};
 const ICON = {{ run:"▢", step:"›", model:"✦", tool:"▤", contract:"✓" }};
 let sel = {{ traj:indexFromHash(), span:0 }};
+sel.span = primarySpanIndex(sel.traj);
 
 function fmtMs(ms){{ return ms >= 1000 ? (ms/1000).toFixed(2)+"s" : ms.toFixed(0)+"ms"; }}
 function el(html){{ const t=document.createElement("template"); t.innerHTML=html.trim(); return t.content.firstChild; }}
@@ -267,9 +268,21 @@ function indexFromHash(){{
   const index = TRACES.findIndex(t => t.trajectory_id === target);
   return index >= 0 ? index : 0;
 }}
+function primarySpanIndex(trajIndex){{
+  const t = TRACES[trajIndex];
+  if(!t || !t.spans || !t.spans.length) return 0;
+  const agent = t.spans.findIndex(
+    s => s.kind === "model" && s.attributes && s.attributes["murmur.agent.id"] === t.trajectory_id
+  );
+  if(agent >= 0) return agent;
+  const model = t.spans.findIndex(s => s.kind === "model");
+  if(model >= 0) return model;
+  const failing = t.spans.findIndex(s => s.status === "error");
+  return failing >= 0 ? failing : 0;
+}}
 window.addEventListener("hashchange", () => {{
   const index = indexFromHash();
-  if(index !== sel.traj){{ sel={{traj:index, span:0}}; render(); }}
+  if(index !== sel.traj){{ sel={{traj:index, span:primarySpanIndex(index)}}; render(); }}
 }});
 
 function spanModalHtml(t, s){{
@@ -317,8 +330,9 @@ function renderRail(){{
     const row = el(`<div class="traj${{sl}}"><span class="dot ${{cls}}"></span>`+
       `<span class="id">#${{String(i+1).padStart(2,"0")}}${{rep}}</span>`+
       `<span class="dur">${{fmtMs(t.total_ms)}}</span></div>`);
+    row.title = t.trajectory_id;
     row.onclick = ()=>{{
-      sel={{traj:i, span:0}};
+      sel={{traj:i, span:primarySpanIndex(i)}};
       history.replaceState(null, "", "#"+encodeURIComponent(t.trajectory_id));
       render();
     }};
@@ -330,8 +344,12 @@ function renderRail(){{
 function renderCenter(){{
   const t = TRACES[sel.traj];
   const col = el(`<div class="col center"></div>`);
+  const primary = t.spans[primarySpanIndex(sel.traj)] || {{}};
+  const primaryAttrs = primary.attributes || {{}};
+  const fp = primaryAttrs["murmur.output.fingerprint"] ? ` · fp ${{primaryAttrs["murmur.output.fingerprint"]}}` : "";
   const rep = t.replay?`<span class="replaybadge">↻ replayed</span>`:"";
   col.appendChild(el(`<div class="runhdr"><span>trajectory <b>#${{String(sel.traj+1).padStart(2,"0")}}</b></span>`+
+    `<span><b>${{esc(t.trajectory_id)}}</b>${{fp}}</span>`+
     `<span><b>${{fmtMs(t.total_ms)}}</b></span>`+
     `<span><b>${{(t.total_tokens/1000).toFixed(1)}}k</b> tok</span>`+
     `<span><b>$${{t.total_cost_usd.toFixed(3)}}</b></span>${{rep}}</div>`));
