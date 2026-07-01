@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import dataclasses
 import json
 import os
 import subprocess
@@ -42,10 +43,11 @@ from murmur.benchmarks.scaffold import Scaffold, run_suite
 from murmur.benchmarks.swe.types import BenchDependencyMissing
 from murmur.benchmarks.swebench import BenchmarkDataUnavailable
 from murmur.config import load_project_env
-from murmur.core.agent_tasks import demo_task, load_agent_task
+from murmur.core.agent_tasks import load_agent_task
 from murmur.core.conductor import RunConductor
 from murmur.core.events import Event, EventType
 from murmur.core.regression import baseline_set_report, regression_verdict
+from murmur.core.types import TaskSpec
 from murmur.domain.contract import Contract
 from murmur.domain.workflow import WorkflowPlan
 from murmur.gateway.tool_gateway import ReplayDivergenceError
@@ -985,7 +987,7 @@ def run(
         typer.echo(f"Trajectory fan written to {out}  (open in a browser)")
 
 
-def _verify_replay(conductor: RunConductor, events: list[Event]) -> int:
+def _verify_replay(conductor: RunConductor, events: list[Event], task: TaskSpec) -> int:
     """Re-execute each recorded trajectory through the replay gateway."""
 
     started = [
@@ -999,7 +1001,7 @@ def _verify_replay(conductor: RunConductor, events: list[Event]) -> int:
             asyncio.run(
                 conductor.replay(
                     events=events,
-                    task=demo_task(),
+                    task=task,
                     trajectory_id=trajectory_id,
                     index=index,
                 )
@@ -1053,7 +1055,7 @@ def trace(
     events = list(asyncio.run(store.read_events()))
 
     if replay:
-        verified = _verify_replay(conductor, events)
+        verified = _verify_replay(conductor, events, spec)
         typer.echo(f"Replay: {verified}/{n} trajectories reproduced exactly from the log.")
 
     traces = events_to_traces(events, capture_content=capture_content, replay=replay)
@@ -1129,17 +1131,23 @@ def replay(
     event_log: Annotated[Path, typer.Option(help="JSONL event log path.")] = Path(
         ".murmur/demo.jsonl"
     ),
+    task: Annotated[
+        str, typer.Option(help="Task the log was recorded with: demo | hard (or MURMUR_TASK).")
+    ] = "",
     mutate: Annotated[
         bool, typer.Option(help="Intentionally change the prompt to prove divergence.")
     ] = False,
 ) -> None:
     """Replay the first recorded trajectory from an event log."""
 
+    spec = load_agent_task(task or None)
+    if mutate:
+        spec = dataclasses.replace(spec, prompt=f"{spec.prompt} (mutated)")
     store = JsonlEventStore(event_log)
     events = list(asyncio.run(store.read_events()))
     conductor = RunConductor(agent=FakeAgent(), storage=store, tools=fake_tools())
     try:
-        output = asyncio.run(conductor.replay(events=events, task=demo_task(mutate=mutate)))
+        output = asyncio.run(conductor.replay(events=events, task=spec))
     except ReplayDivergenceError as exc:
         typer.echo(f"Replay diverged: {exc}", err=True)
         raise typer.Exit(1) from exc
