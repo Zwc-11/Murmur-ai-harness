@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from time import perf_counter
+
 from murmur.benchmarks.swe.providers import create_patch_model, default_model
 from murmur.benchmarks.swe.types import PatchModel
 from murmur.core.ports import ToolGatewayPort
@@ -43,6 +45,7 @@ class DeepSeekCodingAgent:
         for index in range(self._max_steps):
             phase = ("plan", "implement", "refine", "finalize")[min(index, 3)]
             await gateway.step(index=index, phase=phase)
+            started = perf_counter()
             response = self._model.complete(
                 system=_SYSTEM,
                 user=transcript + _step_instruction(index, workspace),
@@ -53,6 +56,7 @@ class DeepSeekCodingAgent:
                 input_tokens=response.input_tokens,
                 output_tokens=response.output_tokens,
                 finish_reason="stop",
+                latency_ms=(perf_counter() - started) * 1000,
                 content=response.text[:500],
             )
             transcript += f"\n\n--- assistant ({phase}) ---\n{response.text}\n"
