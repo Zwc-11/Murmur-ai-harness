@@ -42,11 +42,14 @@ candidate-vs-baseline `pass^k` delta is entirely below zero. `improved` and
 
 ## Real Benchmarks
 
-Real SWE/Terminal-style benchmarks need a model key, Docker, and optional
+Real SWE/Terminal-style benchmarks need a model key, Docker, and the optional
 benchmark dependencies. Murmur refuses to emit public numbers unless the real
 judge ran.
 
 ```bash
 python -m pip install -e ".[bench]"
-murmur bench --subset 50 --n 10 --k 5
+murmur gate --suite swe-bench-verified --real-agent --n 10 --k 5
 ```
+
+See [benchmarks/RUNBOOK.md](benchmarks/RUNBOOK.md) for the non-Docker
+real-model run on the hard task.
