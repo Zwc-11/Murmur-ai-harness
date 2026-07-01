@@ -1,0 +1,25 @@
+# Doc-generation task with a deterministic exact-match contract.
+# The deliverable documents the CI gate's real verdict semantics (see
+# murmur/core/regression.py: only `regressed` blocks a PR).
+#
+# Offline note: the deterministic scaffold (`murmur run --task docgen_gate_verdicts`)
+# cannot produce this text, so synthetic runs show the contract rejecting every
+# attempt. Use a real model for pass rates.
+task_id: docgen.gate_verdicts
+metadata:
+  kind: doc_exact_match
+prompt: |
+  Murmur's CI reliability gate returns one of three verdicts. Only a verdict
+  whose entire 95% confidence interval on the pass^k delta is below zero blocks
+  the pull request; the other two do not block.
+
+  Document this as a Markdown bullet list: exactly three lines, in the order
+  regressed, improved, inconclusive, each formatted as
+
+  - <verdict>: <blocks | does not block>
+
+  Reply with only those three lines — no fences, no extra text.
+expected_output: |
+  - regressed: blocks
+  - improved: does not block
+  - inconclusive: does not block

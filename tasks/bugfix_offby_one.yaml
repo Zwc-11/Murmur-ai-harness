@@ -1,0 +1,27 @@
+# Bugfix-against-a-failing-test spec with a deterministic exact-match contract.
+# The failing behavior is embedded in the prompt; the deliverable is the single
+# corrected line in a canonical form, so the tier-0 judge can verify it with no
+# evaluator.
+#
+# Offline note: the deterministic scaffold (`murmur run --task bugfix_offby_one`)
+# cannot produce this line, so synthetic runs show the contract rejecting every
+# attempt (failure class: contract violation). Use a real model for pass rates.
+task_id: bugfix.offby_one_slice
+metadata:
+  kind: bugfix_exact_line
+prompt: |
+  A Python function should return the first `limit` records, but users report it
+  always returns one record too many:
+
+      def first_records(records: list[dict], limit: int) -> list[dict]:
+          return records[: limit + 1]
+
+  The failing test:
+
+      def test_first_records_respects_limit():
+          assert len(first_records([{}, {}, {}], 2)) == 2
+
+  Fix the bug. Reply with only the corrected return statement on a single line,
+  no leading indentation, no markdown fences, no explanation, and no whitespace
+  inside the slice brackets (write it as `records[:EXPR]`).
+expected_output: "return records[:limit]"

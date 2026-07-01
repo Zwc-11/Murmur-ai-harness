@@ -1,0 +1,19 @@
+# API-client configuration task with a deterministic exact-match contract.
+# The model must derive a canonical minified JSON object from prose constraints;
+# format discipline (key order, minification) is the reliability probe.
+#
+# Offline note: the deterministic scaffold (`murmur run --task api_client_retry`)
+# cannot produce this JSON, so synthetic runs show the contract rejecting every
+# attempt. Use a real model for pass rates.
+task_id: api_client.retry_policy_json
+metadata:
+  kind: canonical_json
+prompt: |
+  Emit the retry policy for the Murmur API client as ONE minified JSON object
+  (no spaces, no newlines) with keys sorted alphabetically. The policy is:
+  exponential backoff starting at 250 milliseconds, at most 3 retries, and
+  retries only on HTTP 429 and 503.
+
+  Use exactly these keys: backoff, base_delay_ms, max_retries, retry_on.
+  Reply with only the JSON object — no markdown fences, no prose.
+expected_output: '{"backoff":"exponential","base_delay_ms":250,"max_retries":3,"retry_on":[429,503]}'

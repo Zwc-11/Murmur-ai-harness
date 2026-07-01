@@ -1,0 +1,33 @@
+# Artifact-generation task validated by the structured hard_website_v1 contract
+# (murmur/core/acceptance.py): HTML document, visible "murmur" copy, an
+# id="metrics" element with pass@1 / pass^k / variance, accent #e8192a, and CSS.
+# Same acceptance contract as tasks/hard.yaml, different page brief.
+#
+# Offline note: this task runs fully offline (`murmur run --task status_page`);
+# the deterministic scaffold emits a contract-conforming artifact on its pass
+# branch, so synthetic runs produce a real pass/fail distribution.
+task_id: hard.status_page
+acceptance: hard_website_v1
+metadata:
+  kind: hard_website
+prompt: |
+  Build a single-page reliability STATUS page for Murmur — an open-source
+  reliability harness for coding agents.
+
+  Deliverables (all required in your final artifact bundle):
+  1. `index.html` — semantic HTML5 with: a status banner (operational /
+     degraded), a per-component status table (harness, gate, trace viewer),
+     an incident-history section, and a footer.
+  2. `styles.css` — linked from the HTML; CSS variables for the tech-noir
+     palette (background #e4e4e0, accent red #e8192a, thin borders, wide
+     letter-spacing on headings). No external CSS frameworks.
+  3. Include the word "murmur" in the page heading (case-insensitive) and an
+     element with id `metrics` showing three reliability stats labelled
+     pass@1, pass^k, and variance.
+  4. Responsive from 320px to 1200px width.
+
+  Constraints:
+  - No JavaScript required (CSS-only interactions OK).
+  - No lorem ipsum — write real microcopy about harness reliability.
+  - Output both files in one message, each in a fenced code block:
+    ```html for index.html and ```css for styles.css.
