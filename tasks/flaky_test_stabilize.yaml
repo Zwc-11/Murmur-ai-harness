@@ -1,0 +1,23 @@
+# Flaky-test stabilization task with a deterministic exact-match contract.
+# The expected answer is a single pytest assertion line that replaces a sleep
+# with an explicit wait helper, so the tier-0 judge can verify it exactly.
+#
+# Offline note: the deterministic scaffold (`murmur run --task flaky_test_stabilize`)
+# cannot produce this line, so synthetic runs show the contract rejecting every
+# attempt. Use a real model for pass rates.
+task_id: tests.flaky_test_stabilize
+metadata:
+  kind: test_fix_exact_line
+prompt: |
+  A flaky pytest waits with time.sleep(1) before checking that an eventually
+  consistent status endpoint becomes ready:
+
+      time.sleep(1)
+      assert fetch_status() == "ready"
+
+  The test suite already provides wait_for_status(callable, target, timeout_s).
+  Replace the flaky assertion with one deterministic polling assertion.
+
+  Reply with only the corrected assertion line, no leading indentation, no
+  markdown fences, and no explanation.
+expected_output: 'assert wait_for_status(fetch_status, target="ready", timeout_s=5.0)'

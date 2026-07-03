@@ -75,8 +75,9 @@ mode — the operator map before a run is launched. Screenshot of
 
 > **All numbers in the synthetic table below are from the deterministic
 > synthetic suite (no API keys, no model).** They demonstrate the harness
-> machinery, not any model's ability. Real-model benchmark:
-> [docs/benchmarks/2026-07-01-deepseek/](docs/benchmarks/2026-07-01-deepseek/)
+> machinery, not any model's ability. Real-model benchmarks:
+> [2026-07-01 n=10](docs/benchmarks/2026-07-01-deepseek/) and
+> [2026-07-02 n=20](docs/benchmarks/2026-07-02-deepseek-hard-n20/)
 > — reproduce it with the [runbook](docs/benchmarks/RUNBOOK.md).
 
 **[synthetic/deterministic]** — seeded scaffold, task `hard.landing_site`,
@@ -104,11 +105,18 @@ N=30, seed 7 ([artifacts](docs/benchmarks/2026-07-01-synthetic/)):
 | Cost (recorded tokens × DeepSeek list price) | $0.87 total (38 calls, 266k in / 207k out tokens) |
 | Latency per attempt | median 214 s, max 291 s |
 
-Both failures were full HTML/CSS artifacts that omitted the contract's
+Additional committed [real-model] evidence:
+
+| Run | Task | n / k | pass@1 | pass^3 empirical | Cost | Wall time | Artifacts |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-07-02 `deepseek-v4-pro` | `hard.landing_site` | 20 / 3 | 0.60 (12/20 pass, Wilson 95% [0.39, 0.78]) | 0.193 | $1.42 (72 calls, 374k in / 352k out tokens) | 57.2 min | [events.jsonl](docs/benchmarks/2026-07-02-deepseek-hard-n20/events.jsonl) / [fan.html](docs/benchmarks/2026-07-02-deepseek-hard-n20/fan.html) / [summary.json](docs/benchmarks/2026-07-02-deepseek-hard-n20/summary.json) / [details](docs/benchmarks/2026-07-02-deepseek-hard-n20/README.md) |
+
+In the 2026-07-01 run, both failures were full HTML/CSS artifacts that omitted the contract's
 required `pass^k` notation (`missing_metric_pass_hat_k`) — the near-miss case
 the contract check exists to catch. Single-day, single-task, single-model
 sample at n=10; the Wilson interval is wide by design honesty, not by
-accident.
+accident. In the 2026-07-02 run, 7 failures missed `pass^k`; 1 missed both
+`pass^k` and the required accent red.
 
 [![Real-model reliability fan report for the DeepSeek run](docs/images/fan-report-real-model.png)](docs/images/fan-report-real-model.png)
 
@@ -127,6 +135,8 @@ candidate run the same tasks under the same seeds, per-task `pass^k` deltas are
 paired, and a seeded bootstrap (10,000 resamples) puts a 95% percentile CI on
 the mean delta. Whole CI below zero → block; above → improved; straddling →
 inconclusive, never blocked.
+The implemented statistical criterion is a seeded paired-delta bootstrap
+confidence interval over per-task projected `pass^k` deltas.
 
 All three verdicts, reproduced locally on 2026-07-01 with no API keys (exact
 commands in the [artifact README](docs/benchmarks/2026-07-01-synthetic/README.md)):
@@ -136,6 +146,11 @@ commands in the [artifact README](docs/benchmarks/2026-07-01-synthetic/README.md
 | First run, seed 7 | [BASELINE SET — pass^5 0.20 over 12 tasks](docs/benchmarks/2026-07-01-synthetic/gate-1-baseline.md) | 0 |
 | Same scaffold, seed 8 | [INCONCLUSIVE — Δ −0.01, CI −0.08 to +0.05](docs/benchmarks/2026-07-01-synthetic/gate-2-inconclusive.md) | 0 (does not block) |
 | Degraded scaffold (−0.12) | [REGRESSED — Δ −0.09, CI −0.14 to −0.05](docs/benchmarks/2026-07-01-synthetic/gate-3-regressed.md) | 1 (blocks) |
+
+[![GitHub PR showing the Murmur reliability gate bot comment and successful Actions run](docs/images/gate-pr-comment.png)](docs/images/gate-pr-comment.png)
+
+*[real capture] PR #15 shows the `github-actions[bot]` Murmur gate comment and
+the PR-triggered `Murmur Reliability Gate` Actions run with `Status Success`.*
 
 ## Quickstart
 
@@ -182,11 +197,12 @@ murmur fix-test --cmd "python -m pytest tests/test_checkout.py -q" --budget 0.50
 
 ## Tasks
 
-[`tasks/`](tasks/) contains six runnable task specs: `demo` (echo smoke test),
+[`tasks/`](tasks/) contains eight runnable task specs: `demo` (echo smoke test),
 `hard` (landing site with the structured `hard_website_v1` acceptance
-contract), `status_page` (same contract family, different brief), and three
+contract), `status_page` (same contract family, different brief), and five
 exact-match contract specs (`bugfix_offby_one`, `api_client_retry`,
-`docgen_gate_verdicts`). Each loads and runs offline via
+`docgen_gate_verdicts`, `json_schema_migration`, and
+`flaky_test_stabilize`). Each loads and runs offline via
 `murmur run --task <name>`; the exact-match specs are written for real models —
 the deterministic scaffold cannot solve them, so offline runs show the contract
 rejecting every attempt, which is the intended demonstration.
@@ -219,7 +235,8 @@ metrics, and orchestration; models, tools, judges, storage, tracing, reports,
 and agents plug in through ports. The bundled agents are the reference patch
 agent (`murmur`), a contract-lite JSON-action agent, the deterministic
 scaffold, and a LangGraph adapter — anything implementing `AgentPort` drops in
-the same way.
+the same way. `murmur.flock` remains a separate workflow-engine layer with its
+own CLI, planner, IR, executor, report path, examples, docs, and tests.
 
 See [docs/architecture.md](docs/architecture.md) for the full design, and
 [docs/dev/](docs/dev/) for the original design plans and review notes.

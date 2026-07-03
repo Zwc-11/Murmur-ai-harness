@@ -1,0 +1,19 @@
+# JSON-schema migration task with a deterministic exact-match contract.
+# The model must emit one canonical minified schema after applying a prose
+# migration request; key order and required-field order are part of the contract.
+#
+# Offline note: the deterministic scaffold (`murmur run --task json_schema_migration`)
+# cannot produce this JSON, so synthetic runs show the contract rejecting every
+# attempt. Use a real model for pass rates.
+task_id: schema.json_schema_migration
+metadata:
+  kind: canonical_json_schema
+prompt: |
+  Migrate the Customer JSON Schema from v1 to v2. Version 1 has object fields
+  id and name, both required strings, and disallows additional properties.
+  Version 2 adds required field email as a string with format email.
+
+  Reply with one minified JSON object only. Use draft 2020-12, title Customer,
+  type object, additionalProperties false, properties ordered email, id, name,
+  and required ordered id, name, email. No markdown fences, no prose.
+expected_output: '{"$schema":"https://json-schema.org/draft/2020-12/schema","additionalProperties":false,"properties":{"email":{"format":"email","type":"string"},"id":{"type":"string"},"name":{"type":"string"}},"required":["id","name","email"],"title":"Customer","type":"object"}'

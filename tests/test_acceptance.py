@@ -47,6 +47,18 @@ def test_load_agent_task_hard_default(monkeypatch) -> None:
     assert task.task_id == "hard.landing_site"
 
 
+def test_new_task_specs_load_and_accept_expected_outputs() -> None:
+    migration = load_agent_task("json_schema_migration")
+    stabilize = load_agent_task("flaky_test_stabilize")
+
+    assert migration.task_id == "schema.json_schema_migration"
+    assert migration.expected_output is not None
+    assert migration.accepts(migration.expected_output)
+    assert stabilize.task_id == "tests.flaky_test_stabilize"
+    assert stabilize.expected_output is not None
+    assert stabilize.accepts(stabilize.expected_output)
+
+
 def test_deepseek_v4_completion_kwargs() -> None:
     from murmur.benchmarks.swe.model import DeepSeekPatchModel
 

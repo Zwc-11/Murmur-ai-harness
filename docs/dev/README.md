@@ -13,6 +13,9 @@ for what is actually implemented and verified today.
 - [code-review-2026-06-12.md](code-review-2026-06-12.md) — a full-codebase
   review pass: bugs found and fixed, modules reviewed clean, known limitations.
 
+- [PRODUCT.md](PRODUCT.md) - the local product/design brief for the Murmur
+  workbench experience.
+
 Repo-root config files `.mcp.json`, `.agents/`, `skills-lock.json`, and
 `.codex/` are local AI-tooling configuration (MCP servers and editor-agent
 skills) used during development; they are not part of the Murmur package or its

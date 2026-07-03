@@ -1,0 +1,105 @@
+{
+  "n": 20,
+  "passes": 12,
+  "k": 3,
+  "models": [
+    "deepseek-v4-pro"
+  ],
+  "pass_at_1": 0.6,
+  "pass_hat_k_projected": 0.21599999999999997,
+  "pass_hat_k_empirical": 0.19298245614035087,
+  "model_calls": 72,
+  "input_tokens": 373600,
+  "output_tokens": 351708,
+  "price_per_mtok": {
+    "input": 0.8,
+    "output": 3.2
+  },
+  "cost_usd_list_price": 1.4243,
+  "latency_ms": {
+    "median": 0.1,
+    "max": 1.0
+  },
+  "outcomes": {
+    "run_c06b524769aa4a298654031bf04aceaf_t1": {
+      "outcome": "fail",
+      "latency_ms": 0.09810004848986864
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t10": {
+      "outcome": "pass",
+      "latency_ms": 0.06749993190169334
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t11": {
+      "outcome": "pass",
+      "latency_ms": 0.024699955247342587
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t12": {
+      "outcome": "fail",
+      "latency_ms": 0.09579991456121206
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t13": {
+      "outcome": "fail",
+      "latency_ms": 0.09120011236518621
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t14": {
+      "outcome": "pass",
+      "latency_ms": 0.06329989992082119
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t15": {
+      "outcome": "pass",
+      "latency_ms": 0.05859986413270235
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t16": {
+      "outcome": "pass",
+      "latency_ms": 0.05180004518479109
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t17": {
+      "outcome": "fail",
+      "latency_ms": 0.0627998961135745
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t18": {
+      "outcome": "fail",
+      "latency_ms": 0.018600025214254856
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t19": {
+      "outcome": "pass",
+      "latency_ms": 0.09660003706812859
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t2": {
+      "outcome": "fail",
+      "latency_ms": 0.05610007792711258
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t20": {
+      "outcome": "pass",
+      "latency_ms": 0.05800009239464998
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t3": {
+      "outcome": "pass",
+      "latency_ms": 1.0306998156011105
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t4": {
+      "outcome": "pass",
+      "latency_ms": 0.06620003841817379
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t5": {
+      "outcome": "fail",
+      "latency_ms": 0.07770024240016937
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t6": {
+      "outcome": "pass",
+      "latency_ms": 0.029600108973681927
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t7": {
+      "outcome": "fail",
+      "latency_ms": 0.5105000454932451
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t8": {
+      "outcome": "pass",
+      "latency_ms": 0.028099981136620045
+    },
+    "run_c06b524769aa4a298654031bf04aceaf_t9": {
+      "outcome": "pass",
+      "latency_ms": 0.03409991040825844
+    }
+  }
+}
