@@ -1,0 +1,433 @@
+{
+  "cost_usd": 0.026550400000000002,
+  "input_tokens": 18100,
+  "latency_ms": 75592.80699997908,
+  "output_tokens": 3772,
+  "requested_model": "deepseek-v4-pro",
+  "score": {
+    "attribution_points": -25.0,
+    "brier": 1.0,
+    "decision": "block",
+    "decision_correct": true,
+    "decision_points": 100.0,
+    "effective_witnesses": 1.323274488656795,
+    "spend": 10,
+    "total": 63.38362755671602,
+    "witness_error": 0.3232744886567951
+  },
+  "seed": 82,
+  "served_models": [
+    "deepseek-v4-pro"
+  ],
+  "turns": [
+    {
+      "action": {
+        "index": 1,
+        "tool": "read_bundle"
+      },
+      "result": {
+        "config": "direct-a",
+        "lane_id": "episode_0082_lane_1",
+        "patch": "def solve(text):\n    encoded = text.encode('utf-8').decode('utf-8')\n    return encoded.strip().lower().replace(' ', '_')\n",
+        "surface_cue": "confident",
+        "test_transcript": "2 passed, 0 failed",
+        "trace": [
+          {
+            "payload": {
+              "index": 0,
+              "phase": "read"
+            },
+            "seq": 1,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "task_id": "normalize_slug"
+              },
+              "tool": "read_task"
+            },
+            "seq": 2,
+            "type": "tool_call"
+          },
+          {
+            "payload": {
+              "index": 1,
+              "phase": "patch"
+            },
+            "seq": 3,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "digest": "198cd40fd843"
+              },
+              "tool": "write_patch"
+            },
+            "seq": 4,
+            "type": "tool_call"
+          },
+          {
+            "payload": {
+              "index": 2,
+              "phase": "test"
+            },
+            "seq": 5,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "suite": "visible"
+              },
+              "tool": "run_tests"
+            },
+            "seq": 6,
+            "type": "tool_call"
+          }
+        ]
+      }
+    },
+    {
+      "action": {
+        "index": 2,
+        "tool": "read_bundle"
+      },
+      "result": {
+        "config": "direct-a",
+        "lane_id": "episode_0082_lane_2",
+        "patch": "def solve(text):\n    encoded = text.encode('utf-8').decode('utf-8')\n    return encoded.strip().lower().replace(' ', '_')\n",
+        "surface_cue": "novel",
+        "test_transcript": "2 passed, 0 failed",
+        "trace": [
+          {
+            "payload": {
+              "index": 0,
+              "phase": "read"
+            },
+            "seq": 1,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "task_id": "normalize_slug"
+              },
+              "tool": "read_task"
+            },
+            "seq": 2,
+            "type": "tool_call"
+          },
+          {
+            "payload": {
+              "index": 1,
+              "phase": "patch"
+            },
+            "seq": 3,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "digest": "198cd40fd843"
+              },
+              "tool": "write_patch"
+            },
+            "seq": 4,
+            "type": "tool_call"
+          },
+          {
+            "payload": {
+              "index": 2,
+              "phase": "test"
+            },
+            "seq": 5,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "suite": "visible"
+              },
+              "tool": "run_tests"
+            },
+            "seq": 6,
+            "type": "tool_call"
+          }
+        ]
+      }
+    },
+    {
+      "action": {
+        "index": 3,
+        "tool": "read_bundle"
+      },
+      "result": {
+        "config": "direct-a",
+        "lane_id": "episode_0082_lane_3",
+        "patch": "def solve(text):\n    encoded = text.encode('utf-8').decode('utf-8')\n    return encoded.strip().lower().replace(' ', '_')\n",
+        "surface_cue": "concise",
+        "test_transcript": "2 passed, 0 failed",
+        "trace": [
+          {
+            "payload": {
+              "index": 0,
+              "phase": "read"
+            },
+            "seq": 1,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "task_id": "normalize_slug"
+              },
+              "tool": "read_task"
+            },
+            "seq": 2,
+            "type": "tool_call"
+          },
+          {
+            "payload": {
+              "index": 1,
+              "phase": "patch"
+            },
+            "seq": 3,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "digest": "198cd40fd843"
+              },
+              "tool": "write_patch"
+            },
+            "seq": 4,
+            "type": "tool_call"
+          },
+          {
+            "payload": {
+              "index": 2,
+              "phase": "test"
+            },
+            "seq": 5,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "suite": "visible"
+              },
+              "tool": "run_tests"
+            },
+            "seq": 6,
+            "type": "tool_call"
+          }
+        ]
+      }
+    },
+    {
+      "action": {
+        "index": 4,
+        "tool": "read_bundle"
+      },
+      "result": {
+        "config": "decomposed",
+        "lane_id": "episode_0082_lane_4",
+        "patch": "def solve(text):\n    encoded = text.encode('utf-8').decode('utf-8')\n    return encoded.strip().lower().replace(' ', '_')\n",
+        "surface_cue": "documented",
+        "test_transcript": "2 passed, 0 failed",
+        "trace": [
+          {
+            "payload": {
+              "index": 0,
+              "phase": "read"
+            },
+            "seq": 1,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "task_id": "normalize_slug"
+              },
+              "tool": "read_task"
+            },
+            "seq": 2,
+            "type": "tool_call"
+          },
+          {
+            "payload": {
+              "index": 1,
+              "phase": "patch"
+            },
+            "seq": 3,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "digest": "198cd40fd843"
+              },
+              "tool": "write_patch"
+            },
+            "seq": 4,
+            "type": "tool_call"
+          },
+          {
+            "payload": {
+              "index": 2,
+              "phase": "test"
+            },
+            "seq": 5,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "suite": "visible"
+              },
+              "tool": "run_tests"
+            },
+            "seq": 6,
+            "type": "tool_call"
+          }
+        ]
+      }
+    },
+    {
+      "action": {
+        "index": 5,
+        "tool": "read_bundle"
+      },
+      "result": {
+        "config": "direct-b",
+        "lane_id": "episode_0082_lane_5",
+        "patch": "def solve(text):\n    encoded = text.encode('utf-8').decode('utf-8')\n    return encoded.lstrip().lower().replace(' ', '-')\n",
+        "surface_cue": "tested",
+        "test_transcript": "2 passed, 0 failed",
+        "trace": [
+          {
+            "payload": {
+              "index": 0,
+              "phase": "read"
+            },
+            "seq": 1,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "task_id": "normalize_slug"
+              },
+              "tool": "read_task"
+            },
+            "seq": 2,
+            "type": "tool_call"
+          },
+          {
+            "payload": {
+              "index": 1,
+              "phase": "patch"
+            },
+            "seq": 3,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "digest": "d736800f72b0"
+              },
+              "tool": "write_patch"
+            },
+            "seq": 4,
+            "type": "tool_call"
+          },
+          {
+            "payload": {
+              "index": 2,
+              "phase": "test"
+            },
+            "seq": 5,
+            "type": "step_started"
+          },
+          {
+            "payload": {
+              "args": {
+                "suite": "visible"
+              },
+              "tool": "run_tests"
+            },
+            "seq": 6,
+            "type": "tool_call"
+          }
+        ]
+      }
+    },
+    {
+      "action": {
+        "code": "assert solve('  Hello World  ') == 'hello-world'",
+        "tool": "write_test"
+      },
+      "result": {
+        "accepted": true,
+        "test_id": 1
+      }
+    },
+    {
+      "action": {
+        "test_id": 1,
+        "tool": "run_test_all"
+      },
+      "result": [
+        {
+          "lane_id": "episode_0082_lane_1",
+          "passed": false
+        },
+        {
+          "lane_id": "episode_0082_lane_2",
+          "passed": false
+        },
+        {
+          "lane_id": "episode_0082_lane_3",
+          "passed": false
+        },
+        {
+          "lane_id": "episode_0082_lane_4",
+          "passed": false
+        },
+        {
+          "lane_id": "episode_0082_lane_5",
+          "passed": false
+        }
+      ]
+    },
+    {
+      "action": {
+        "decision": "block",
+        "probability": 1.0,
+        "report": {
+          "episode_0082_lane_1": "wrong_replacement",
+          "episode_0082_lane_2": "wrong_replacement",
+          "episode_0082_lane_3": "wrong_replacement",
+          "episode_0082_lane_4": "wrong_replacement",
+          "episode_0082_lane_5": "incomplete_trimming"
+        },
+        "tool": "decide",
+        "witnesses": 1
+      },
+      "result": {
+        "attribution_points": -25.0,
+        "brier": 1.0,
+        "decision": "block",
+        "decision_correct": true,
+        "decision_points": 100.0,
+        "effective_witnesses": 1.323274488656795,
+        "spend": 10,
+        "total": 63.38362755671602,
+        "witness_error": 0.3232744886567951
+      }
+    }
+  ]
+}

@@ -92,5 +92,21 @@ def render_fan(
         "  pass^k empirical  "
         f"{_bar(metrics.pass_at_k_unbiased, width, color, ascii_only, 'fail')}  "
         f"{metrics.pass_at_k_unbiased:.4f}  (unbiased; {passes}/{total} pass)",
+        f"  effective witnesses  {metrics.effective_witnesses} of {passes} passes",
+        "  failure families  "
+        + (
+            ", ".join(
+                f"{label}={count}"
+                for label, count in sorted(
+                    metrics.failure_families.items(), key=lambda item: (-item[1], item[0])
+                )
+            )
+            or "none"
+        ),
     ]
+    if (
+        metrics.failure_concentration > 0.5
+        or metrics.effective_witnesses < passes / 2
+    ):
+        lines.append("  warning: attempts are correlated; i.i.d. pass^k is optimistic.")
     return "\n".join(lines)

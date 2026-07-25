@@ -109,6 +109,8 @@ class TrajectoryResult:
     failure_step: int | None = None
     failure_detail: str | None = None
     failure_confidence: float | None = None
+    diagnostic_ids: tuple[str, ...] = ()
+    action_signature: tuple[Any, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,6 +130,10 @@ class ReliabilityMetrics:
     mean_cost: float
     p50_latency_ms: float
     p95_latency_ms: float
+    failure_concentration: float
+    effective_failure_families: float
+    effective_witnesses: int
+    failure_families: dict[str, int]
     pass_at_k_unbiased: float = 0.0
     curve: tuple[ReliabilityCurvePoint, ...] = ()
     failure_breakdown: dict[str, int] = field(default_factory=dict)

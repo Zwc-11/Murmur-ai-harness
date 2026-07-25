@@ -23,7 +23,8 @@ introduced by Sierra's τ-bench ([arXiv:2406.12045](https://arxiv.org/abs/2406.1
 to measure agent reliability across repeated trials. Murmur's contribution is
 operational: contract-first validation of every attempt, stable failure-class
 stamping on every failed trajectory, and statistical CI enforcement of `pass^k`
-on coding workflows — including [gating this repo's own pull requests](#the-ci-gate-dogfooded-on-this-repo).
+on coding workflows — including [gating this repo's own pull requests](#the-ci-gate-dogfooded-on-this-repo)
+(the CI gate exercises the deterministic synthetic suite).
 
 Murmur is a harness, not a model. It ships a reference patch agent
 ([`murmur/adapters/agents/murmur_patch.py`](murmur/adapters/agents/murmur_patch.py))
@@ -42,8 +43,9 @@ adapter and the deterministic scaffold plug in the same way).
 - **Explains failures**: stamps failed trajectories with stable failure
   classes, diagnostic IDs, and evidence.
 - **Records traces**: writes `gen_ai.*`-style spans and Murmur-specific
-  attributes for every workflow step, with exact replay verification against
-  the event log.
+  attributes for every workflow step, with exact replay verification of the
+  recorded tool-call path (deterministic agents; model calls are verified by
+  name).
 - **Gates CI on statistics, not noise**: the gate compares per-task `pass^k`
   against a stored baseline with a seeded paired-delta bootstrap (10,000
   resamples, 95% percentile CI) and blocks only when the entire CI is below
@@ -79,6 +81,9 @@ mode — the operator map before a run is launched. Screenshot of
 > [2026-07-01 n=10](docs/benchmarks/2026-07-01-deepseek/) and
 > [2026-07-02 n=20](docs/benchmarks/2026-07-02-deepseek-hard-n20/)
 > — reproduce it with the [runbook](docs/benchmarks/RUNBOOK.md).
+
+The [effective-evidence note](docs/notes/effective-evidence.md) measures how
+shared failure families in these runs challenge the i.i.d. `pass^k` projection.
 
 **[synthetic/deterministic]** — seeded scaffold, task `hard.landing_site`,
 N=30, seed 7 ([artifacts](docs/benchmarks/2026-07-01-synthetic/)):

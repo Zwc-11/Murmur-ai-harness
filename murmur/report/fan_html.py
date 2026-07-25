@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
-from collections import Counter, defaultdict
+from collections import defaultdict
 from html import escape
 from pathlib import Path
 from typing import Any
 
 from murmur.core.divergence import DivergenceOverlay, build_divergence_overlay, signature_label
 from murmur.core.events import Event
+from murmur.core.metrics import failure_family
 from murmur.core.types import RunResult
 from murmur.report.ui_theme import (
     document_close,
@@ -100,9 +101,10 @@ def render_fan_html(
         "</div></section>"
         f"{_overlay_section(overlay, trace_href)}"
         f"{_workflow_progress_section(workflow_progress)}"
+        f"{_effective_evidence_panel(result)}"
         '<section class="cols">'
         f"{_judgment_panel(result)}"
-        f"{_failure_panel(result, failure_index)}"
+        f"{_failure_panel(result)}"
         "</section>"
         f"{hud_shell_end()}"
         f'<script type="application/json" id="murmur-failure-data">{json.dumps(failure_index)}</script>'
@@ -116,7 +118,7 @@ def _failure_index(result: RunResult, trace_href: str | None) -> dict[str, list[
     for index, item in enumerate(result.trajectories):
         if item.outcome == "pass":
             continue
-        label = item.failure_class or item.outcome
+        label = failure_family(item)
         link = ""
         if trace_href:
             link = f"{trace_href}#{item.trajectory_id}"
@@ -615,11 +617,36 @@ def _judgment_panel(result: RunResult) -> str:
     )
 
 
-def _failure_panel(result: RunResult, failure_index: dict[str, list[dict[str, str]]]) -> str:
-    counts = Counter(
-        item.failure_class or item.outcome for item in result.trajectories if item.outcome != "pass"
+def _effective_evidence_panel(result: RunResult) -> str:
+    metrics = result.metrics
+    passes = sum(item.outcome == "pass" for item in result.trajectories)
+    warning = ""
+    if (
+        metrics.failure_concentration > 0.5
+        or metrics.effective_witnesses < passes / 2
+    ):
+        warning = (
+            '<p class="lead">attempts are correlated; i.i.d. pass^k is optimistic.</p>'
+        )
+    return (
+        '<section class="hud-widget">'
+        '<div class="hud-widget__hd">effective evidence</div>'
+        '<div class="hud-widget__bd">'
+        f"{warning}"
+        '<div class="kv"><span class="k">effective witnesses</span>'
+        f"<span>{metrics.effective_witnesses} of {passes} passes</span></div>"
+        '<div class="kv"><span class="k">failure concentration</span>'
+        f"<span>{metrics.failure_concentration:.3f}</span></div>"
+        '<div class="kv"><span class="k">effective failure families</span>'
+        f"<span>{metrics.effective_failure_families:.2f}</span></div>"
+        "</div></section>"
     )
-    if not counts:
+
+
+def _failure_panel(result: RunResult) -> str:
+    counts = result.metrics.failure_families
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    if not ordered:
         rows = '<p class="sub">all trajectories passed</p>'
     else:
         total = sum(counts.values())
@@ -627,11 +654,11 @@ def _failure_panel(result: RunResult, failure_index: dict[str, list[dict[str, st
             '<span class="seg" data-failure-class="'
             f'{escape(label)}" style="width:{(count / total) * 100:.1f}%;'
             f'background:{_class_color(label)}" title="{escape(label)}: {count}"></span>'
-            for label, count in counts.items()
+            for label, count in ordered
         )
         items = "".join(
             f'<div class="kv"><span class="k">{escape(label)}</span><span>{count}</span></div>'
-            for label, count in counts.items()
+            for label, count in ordered
         )
         rows = (
             f'<p class="sub" style="margin:0 0 8px">click a segment for trajectory list</p>'
@@ -639,12 +666,13 @@ def _failure_panel(result: RunResult, failure_index: dict[str, list[dict[str, st
         )
     return (
         '<div class="hud-widget">'
-        '<div class="hud-widget__hd">diagnosis</div>'
+        '<div class="hud-widget__hd">failure families</div>'
         f'<div class="hud-widget__bd">{rows}</div></div>'
     )
 
 
 def _class_color(label: str) -> str:
+    label = label.split(" / ", 1)[0]
     return {
         "tool_error": "#c45c00",
         "schema_mismatch": "#e8192a",

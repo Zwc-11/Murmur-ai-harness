@@ -56,7 +56,7 @@ murmur = "murmur.cli:app"
 chorus = "murmur.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["murmur"]
+packages = ["murmur", "envs"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "murmur/report/static/agent-map.js" = "murmur/report/static/agent-map.js"
@@ -64,7 +64,7 @@ packages = ["murmur"]
 
 [tool.pytest.ini_options]
 addopts = "-s"
-testpaths = ["tests"]
+testpaths = ["tests", "envs/independent_evidence/tests"]
 
 [tool.ruff]
 line-length = 100

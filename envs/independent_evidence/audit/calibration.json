@@ -1,0 +1,14 @@
+{
+  "accepted": true,
+  "best_baseline": "uniform-spend",
+  "episodes": 200,
+  "gap": 88.4152269999957,
+  "mean_scores": {
+    "codet-agreement": 8.286813634567082,
+    "majority-vote": -1.7850352008283483,
+    "ship-if-all-green": 4.892006866895538,
+    "uniform-spend": 19.6047730000043
+  },
+  "mean_upper_bound": 108.02,
+  "seed": 7
+}

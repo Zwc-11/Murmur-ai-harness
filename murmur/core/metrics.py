@@ -18,9 +18,10 @@ of Murmur:
 from __future__ import annotations
 
 from collections import Counter
-from math import comb
+from math import comb, exp, log
 from statistics import median
 
+from murmur.core.divergence import cluster_signatures
 from murmur.core.types import ReliabilityCurvePoint, ReliabilityMetrics, TrajectoryResult
 
 
@@ -81,6 +82,51 @@ def percentile(values: list[float], percentile_value: float) -> float:
     return ordered[index]
 
 
+def failure_family(trajectory: TrajectoryResult) -> str:
+    label = trajectory.failure_class or trajectory.outcome
+    if not trajectory.diagnostic_ids:
+        return label
+    return f"{label} / {', '.join(sorted(trajectory.diagnostic_ids))}"
+
+
+def failure_families(trajectories: tuple[TrajectoryResult, ...]) -> dict[str, int]:
+    return dict(
+        Counter(
+            failure_family(trajectory)
+            for trajectory in trajectories
+            if trajectory.outcome != "pass"
+        )
+    )
+
+
+def failure_concentration(trajectories: tuple[TrajectoryResult, ...]) -> float:
+    """Herfindahl concentration of recorded failure families."""
+
+    counts = failure_families(trajectories).values()
+    total = sum(counts)
+    return sum((count / total) ** 2 for count in counts) if total else 0.0
+
+
+def effective_failure_families(trajectories: tuple[TrajectoryResult, ...]) -> float:
+    """Entropy-equivalent number of recorded failure families."""
+
+    counts = failure_families(trajectories).values()
+    total = sum(counts)
+    if not total:
+        return 0.0
+    entropy = -sum((count / total) * log(count / total) for count in counts)
+    return exp(entropy)
+
+
+def effective_witnesses(trajectories: tuple[TrajectoryResult, ...]) -> int:
+    signatures = [
+        trajectory.action_signature
+        for trajectory in trajectories
+        if trajectory.outcome == "pass"
+    ]
+    return len(cluster_signatures(signatures)) if signatures else 0
+
+
 def reliability_metrics(
     trajectories: tuple[TrajectoryResult, ...],
     *,
@@ -103,6 +149,7 @@ def reliability_metrics(
         for trajectory in trajectories
         if trajectory.outcome != "pass"
     )
+    families = failure_families(trajectories)
 
     return ReliabilityMetrics(
         pass_at_1=pass_rate,
@@ -113,6 +160,10 @@ def reliability_metrics(
         mean_cost=sum(costs) / total if total else 0.0,
         p50_latency_ms=median(latencies) if latencies else 0.0,
         p95_latency_ms=percentile(latencies, 0.95),
+        failure_concentration=failure_concentration(trajectories),
+        effective_failure_families=effective_failure_families(trajectories),
+        effective_witnesses=effective_witnesses(trajectories),
+        failure_families=families,
         pass_at_k_unbiased=pass_hat_k_unbiased(passes, total, horizon),
         curve=reliability_curve(passes, total),
         failure_breakdown=dict(failures),

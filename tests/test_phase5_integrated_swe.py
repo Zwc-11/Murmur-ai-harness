@@ -8,6 +8,7 @@ anthropic, no swebench, no Docker.
 from __future__ import annotations
 
 import asyncio
+from time import sleep
 
 from murmur.adapters.agents.swe import SwePatchAgent
 from murmur.adapters.storage.memory import InMemoryEventStore
@@ -37,6 +38,7 @@ class FakePatchModel:
     def complete(self, *, system, user, seed, max_tokens=4096) -> ModelResponse:
         del system, user, seed, max_tokens
         self.calls += 1
+        sleep(0.001)
         return ModelResponse(text="```diff\n+ patched\n```", input_tokens=12, output_tokens=4)
 
 
@@ -101,7 +103,9 @@ def test_swe_patch_agent_emits_patch_and_records_model_calls() -> None:
     assert result.trajectories[0].output == "+ patched"  # fenced diff extracted
     assert model.calls == 1
     events = _run(store.read_events())
-    assert sum(1 for e in events if e.type == EventType.MODEL_CALL) == 1
+    model_events = [event for event in events if event.type == EventType.MODEL_CALL]
+    assert len(model_events) == 1
+    assert model_events[0].payload["latency_ms"] > 0
 
 
 def test_self_repair_agent_makes_two_turns() -> None:

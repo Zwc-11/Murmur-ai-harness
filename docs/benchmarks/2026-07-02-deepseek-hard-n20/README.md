@@ -39,13 +39,18 @@ Failure details:
 - 7 x `missing_metric_pass_hat_k`
 - 1 x `missing_metric_pass_hat_k, missing_accent_red`
 
+## Known data flaw
+
+Model-call `latency_ms` was recorded as `0.0` for all 72 calls due to a bug
+in the run path; the fix in `593c53f` covered only the n=10 path. The
+`summary.json` latency block is therefore invalid. Timestamps, token counts,
+outcomes, and wall time remain valid: the event log spans 2026-07-02
+20:25:43-21:22:53 UTC, or 57.2 minutes.
+
 Notes on provenance:
 
 - The per-lane `$` amounts inside `fan.html` use the conductor's generic
   simulator price table, not DeepSeek billing; the honest cost number is the
   $1.42 above, recomputed from recorded token usage at DeepSeek list prices.
-- The `latency_ms` values in `summary.json` come from trajectory-finished event
-  payloads, which are near-zero harness-local timings in this run. Use the wall
-  time above for elapsed runtime.
 - Sample size is n = 20 on one task and one model. This is real-model evidence
   for the harness path, not a leaderboard claim.

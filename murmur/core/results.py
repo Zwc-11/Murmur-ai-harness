@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from murmur.core.divergence import group_trajectory_events
+from murmur.core.divergence import group_trajectory_events, step_signature
 from murmur.core.events import Event, EventType
 from murmur.core.metrics import reliability_metrics
 from murmur.core.types import RunResult, TrajectoryResult
@@ -54,11 +54,14 @@ def _trajectory_result(trajectory_id: str, events: list[Event]) -> TrajectoryRes
     failure_step = None
     failure_detail = None
     failure_confidence = None
+    diagnostic_ids: set[str] = set()
     cost_usd = 0.0
     latency_ms = 0.0
 
     for event in events:
-        if event.type == EventType.VERDICT:
+        if event.type == EventType.CONTRACT_CHECK:
+            diagnostic_ids.update(str(item) for item in event.payload.get("diagnostic_ids", ()))
+        elif event.type == EventType.VERDICT:
             outcome = str(event.payload.get("outcome", outcome))
             output = str(event.payload.get("output", ""))
             failure_class = event.payload.get("failure_class")
@@ -80,4 +83,10 @@ def _trajectory_result(trajectory_id: str, events: list[Event]) -> TrajectoryRes
         failure_step=int(failure_step) if failure_step is not None else None,
         failure_detail=str(failure_detail) if failure_detail is not None else None,
         failure_confidence=float(failure_confidence) if failure_confidence is not None else None,
+        diagnostic_ids=tuple(sorted(diagnostic_ids)),
+        action_signature=tuple(
+            step_signature(events, int(event.payload["index"]))
+            for event in events
+            if event.type == EventType.STEP_STARTED
+        ),
     )

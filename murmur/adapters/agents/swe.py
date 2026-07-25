@@ -15,6 +15,8 @@ harness-only diff the batch scaffolds compare, expressed against the same ports.
 
 from __future__ import annotations
 
+from time import perf_counter
+
 from murmur.benchmarks.swe.scaffold import (
     _REPAIR_SYSTEM,
     _SYSTEM,
@@ -52,11 +54,13 @@ class SwePatchAgent:
         self, gateway: ToolGatewayPort, *, step: int, system: str, user: str, seed: int
     ) -> str:
         await gateway.step(index=step, phase="repair" if step else "generate")
+        started = perf_counter()
         response = self._model.complete(system=system, user=user, seed=seed)
         await gateway.model(
             model=getattr(self._model, "model", "patch-model"),
             input_tokens=response.input_tokens,
             output_tokens=response.output_tokens,
             finish_reason="stop",
+            latency_ms=(perf_counter() - started) * 1000,
         )
         return extract_patch(response.text)

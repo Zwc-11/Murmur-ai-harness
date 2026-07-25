@@ -18,6 +18,8 @@ from murmur.core.conductor import RunConductor
 from murmur.core.divergence import build_divergence_overlay, group_trajectory_events
 from murmur.core.events import Event, EventType
 from murmur.core.metrics import (
+    effective_failure_families,
+    failure_concentration,
     pass_hat_k_unbiased,
     reliability_curve,
     reliability_metrics,
@@ -26,6 +28,7 @@ from murmur.core.metrics import (
 from murmur.core.results import result_from_events
 from murmur.core.types import ReliabilityMetrics, RunResult, TaskSpec, TrajectoryResult
 from murmur.report.fan import render_fan
+from murmur.report.fan_html import render_fan_html
 
 TASK = TaskSpec(
     task_id="demo.echo_uppercase",
@@ -57,6 +60,39 @@ def _trajectory(outcome: str) -> TrajectoryResult:
         cost_usd=0.0,
         latency_ms=0.0,
     )
+
+
+def _failure(diagnostic_id: str) -> TrajectoryResult:
+    return TrajectoryResult(
+        trajectory_id=diagnostic_id,
+        outcome="fail",
+        output="",
+        failure_class="contract_violation",
+        cost_usd=0.0,
+        latency_ms=0.0,
+        diagnostic_ids=(diagnostic_id,),
+    )
+
+
+def test_failure_evidence_measures_shared_and_distinct_families() -> None:
+    shared = tuple(_failure("missing_metric_pass_hat_k") for _ in range(10))
+    distinct = tuple(_failure(f"diagnostic_{index}") for index in range(10))
+
+    assert failure_concentration(shared) == 1.0
+    assert effective_failure_families(shared) == 1.0
+    assert abs(failure_concentration(distinct) - 0.1) < 1e-9
+    assert abs(effective_failure_families(distinct) - 10.0) < 1e-9
+
+
+def test_effective_witnesses_clusters_full_passing_action_sequences() -> None:
+    trajectories = (
+        TrajectoryResult("a", "pass", "", None, 0.0, 0.0, action_signature=(("read",),)),
+        TrajectoryResult("b", "pass", "", None, 0.0, 0.0, action_signature=(("read",),)),
+        TrajectoryResult("c", "pass", "", None, 0.0, 0.0, action_signature=(("edit",),)),
+        _failure("broken"),
+    )
+
+    assert reliability_metrics(trajectories).effective_witnesses == 2
 
 
 def test_pass_at_k_is_per_run_rate_to_the_k() -> None:
@@ -173,6 +209,10 @@ def test_fan_view_reflects_outcomes() -> None:
         mean_cost=0.01,
         p50_latency_ms=10.0,
         p95_latency_ms=20.0,
+        failure_concentration=1.0,
+        effective_failure_families=1.0,
+        effective_witnesses=1,
+        failure_families={"fail": 1},
     )
     result = RunResult(
         run_id="run_demo",
@@ -186,6 +226,13 @@ def test_fan_view_reflects_outcomes() -> None:
     assert "pass@1" in rendered
     assert "pass^k" in rendered
     assert "run_demo" in rendered
+    assert "effective witnesses  1 of 1 passes" in rendered
+    assert "attempts are correlated; i.i.d. pass^k is optimistic." in rendered
+
+    html = render_fan_html(result)
+    assert "failure families" in html
+    assert "effective witnesses" in html
+    assert "attempts are correlated; i.i.d. pass^k is optimistic." in html
 
 
 def _event(

@@ -19,6 +19,9 @@ from math import comb
 from pathlib import Path
 from statistics import median
 
+from murmur.core.events import Event
+from murmur.core.results import result_from_events
+
 
 def load_events(path: Path) -> list[dict]:
     events = []
@@ -63,6 +66,7 @@ def summarize(events: list[dict], *, k: int, price_in: float, price_out: float) 
             return 0.0
         return comb(passes, horizon) / comb(n, horizon)
 
+    evidence = result_from_events([Event.from_dict(event) for event in events]).metrics
     return {
         "n": n,
         "passes": passes,
@@ -80,6 +84,10 @@ def summarize(events: list[dict], *, k: int, price_in: float, price_out: float) 
             "median": round(median(latencies), 1) if latencies else 0.0,
             "max": round(latencies[-1], 1) if latencies else 0.0,
         },
+        "failure_concentration": evidence.failure_concentration,
+        "effective_failure_families": evidence.effective_failure_families,
+        "effective_witnesses": evidence.effective_witnesses,
+        "failure_families": evidence.failure_families,
         "outcomes": {
             trajectory_id: trajectories[trajectory_id]
             for trajectory_id in sorted(trajectories)

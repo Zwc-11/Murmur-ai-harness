@@ -14,6 +14,8 @@ to ignore the gate. Blocking only when a regression is statistically real -- and
 saying "inconclusive, widen N" otherwise -- is what makes the gate survive
 contact with a real team. The bootstrap is seeded so the same inputs always give
 the same verdict; a CI gate that flickers is worse than none.
+The synthetic suite has only 12 paired tasks, so percentile-bootstrap coverage
+is approximate at that sample size.
 """
 
 from __future__ import annotations
