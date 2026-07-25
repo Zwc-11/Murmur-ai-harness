@@ -37,6 +37,9 @@ standard estimators, but now flags concentrated failures and duplicate passing
 paths beside them. Release decisions should treat those warnings as evidence that
 the i.i.d. projection is optimistic.
 
+The [DeepSeek transfer exhibit](deepseek-transfer.md) combines both runs and
+shows that all 10 failed trajectories reduce to one common-mode failure witness.
+
 Prior art: [τ-bench](https://arxiv.org/abs/2406.12045) introduced `pass^k` for
 agent reliability; [Correlated Errors in Large Language
 Models](https://arxiv.org/abs/2506.07962) measures shared model errors; and
